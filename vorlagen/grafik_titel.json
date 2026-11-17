@@ -1,0 +1,15 @@
+{
+  "_hinweis": "Titelbildschirm (tools/titelbild.py): Menüwörter in Großbuchstaben übersetzen; credit = optionale Zeile über der Copyright-Zeile, z. B. 'Traduction : <Name>'. Leer = Original bleibt.",
+  "menue": {
+    "NEW GAME": "",
+    "CONTINUE": "",
+    "DATA": ""
+  },
+  "schrift": "Arial Narrow",
+  "schrift_fett": true,
+  "credit": "",
+  "credit_schrift": "Arial",
+  "credit_fett": true,
+  "credit_hoehe": 11,
+  "credit_position": "ueber"
+}

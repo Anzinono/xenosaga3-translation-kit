@@ -1,0 +1,136 @@
+{
+  "_hinweis": "Datenbankbilder jpg/us/dtimg_*.jpg mit englischem Text. Je Zeile: ungefährer Bereich 'box' [x0,y0,x1,y1] (Bildpixel 211x134), 'en' Originaltext, 'de' neuer Text. 'hell': Schrift heller als der Hintergrund. 'ausrichtung': links/rechts/mitte. 'sperren': Buchstaben einzeln mit Abstand setzen statt stauchen. 'groesse'/'stauchung': feste Werte statt Ausmessen (bei unruhigem Hintergrund). 'kontrast': Schwelle für die Schrifterkennung (Standard 32), 'loeschrand': Breite der Löschmaske (3 = 1 px Rand). 'loeschbox' je Bild: ganzen Bereich spaltenweise löschen statt nur Schriftpixel. Identische Kopien in der 1xxx-Reihe werden mit geändert. Erzeugt von tools/dbbilder.py, siehe docs/grafik.md.",
+  "bilder": [
+    {
+      "datei": "jpg/us/dtimg_0150.jpg",
+      "zeilen": [
+        {
+          "box": [
+            88,
+            58,
+            208,
+            80
+          ],
+          "en": "Transgenic Type",
+          "xx": "",
+          "schrift": "times.ttf",
+          "hell": false,
+          "ausrichtung": "rechts",
+          "schatten": [
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "datei": "jpg/us/dtimg_0176.jpg",
+      "zeilen": [
+        {
+          "box": [
+            10,
+            58,
+            208,
+            76
+          ],
+          "en": "REALIAN",
+          "xx": "",
+          "schrift": "times.ttf",
+          "hell": true,
+          "ausrichtung": "mitte",
+          "sperren": true,
+          "groesse": 18
+        }
+      ]
+    },
+    {
+      "datei": "jpg/us/dtimg_0237.jpg",
+      "zeilen": [
+        {
+          "box": [
+            104,
+            88,
+            200,
+            102
+          ],
+          "en": "TYPE 27",
+          "xx": "",
+          "schrift": "bahnschrift.ttf",
+          "breite_faktor": 1.35,
+          "hell": true,
+          "ausrichtung": "rechts"
+        },
+        {
+          "box": [
+            64,
+            101,
+            200,
+            114
+          ],
+          "en": "COMBAT REALIAN",
+          "xx": "",
+          "schrift": "bahnschrift.ttf",
+          "breite_faktor": 1.35,
+          "hell": true,
+          "ausrichtung": "rechts"
+        }
+      ]
+    },
+    {
+      "datei": "jpg/us/dtimg_0151.jpg",
+      "loeschbox": [
+        8,
+        2,
+        206,
+        47
+      ],
+      "zeilen": [
+        {
+          "box": [
+            10,
+            4,
+            200,
+            16
+          ],
+          "en": "Connection system NATARAJA  now loading...",
+          "xx": "",
+          "schrift": "timesbd.ttf",
+          "hell": true,
+          "ausrichtung": "links",
+          "groesse": 12,
+          "stauchung": 0.815
+        },
+        {
+          "box": [
+            10,
+            19,
+            120,
+            30
+          ],
+          "en": "User name: Shion Uzuki",
+          "xx": "",
+          "schrift": "timesbd.ttf",
+          "hell": true,
+          "ausrichtung": "links",
+          "groesse": 12,
+          "stauchung": 0.815
+        },
+        {
+          "box": [
+            10,
+            33,
+            170,
+            45
+          ],
+          "en": "Password: Ye shall be as gods",
+          "xx": "",
+          "schrift": "timesbd.ttf",
+          "hell": true,
+          "ausrichtung": "links",
+          "groesse": 12,
+          "stauchung": 0.815
+        }
+      ]
+    }
+  ]
+}

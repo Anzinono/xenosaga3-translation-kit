@@ -1,0 +1,216 @@
+{
+  "_hinweis": "Ortseinblendungen (Effekt-Dateien ef/esd/us/*.esd, ef/map/us/*.esp). 'maske' = Name der Deckkraftmaske, 'en' = Originaltext (dient zum Ausmessen der Schriftgröße), 'de' = neuer Text. Leeres 'de' oder Eintrag fehlt = bleibt englisch. Erzeugt von tools/ortstitel.py, siehe docs/grafik.md.",
+  "stile": {
+    "A": {
+      "_hinweis": "Gebietstitel 256x32, verzierte Schrift mit Schatten",
+      "schrift": "courbd.ttf",
+      "schatten": [
+        [
+          1,
+          1
+        ],
+        [
+          2,
+          2
+        ]
+      ],
+      "schatten_deckkraft": 64
+    },
+    "B": {
+      "_hinweis": "Kartenbeschriftungen 256x64 und Hinweiszeile, schlicht",
+      "schrift": "msgothic.ttc",
+      "schatten": [],
+      "schatten_deckkraft": 0
+    }
+  },
+  "max_breite": 250,
+  "eintraege": [
+    {
+      "maske": "vectorsdivision-a.bmp",
+      "stil": "A",
+      "en": "Vector S-Line Division",
+      "xx": ""
+    },
+    {
+      "maske": "pediaisland-a.bmp",
+      "stil": "A",
+      "en": "Pedea Island",
+      "xx": ""
+    },
+    {
+      "maske": "1stmarchant-a.bmp",
+      "stil": "A",
+      "en": "First Business District",
+      "xx": ""
+    },
+    {
+      "maske": "5thelsalem-a.bmp",
+      "stil": "A",
+      "en": "Fifth Jerusalem",
+      "xx": ""
+    },
+    {
+      "maske": "spaceport-a.bmp",
+      "stil": "A",
+      "en": "Federation Orbital Space Port",
+      "xx": ""
+    },
+    {
+      "maske": "examinationhall-a.bmp",
+      "stil": "A",
+      "en": "CAT Testing Ground",
+      "xx": ""
+    },
+    {
+      "maske": "levitationisland-a.bmp",
+      "stil": "A",
+      "en": "Floating Landmass",
+      "xx": ""
+    },
+    {
+      "maske": "forest-a.bmp",
+      "stil": "A",
+      "en": "Forest",
+      "xx": ""
+    },
+    {
+      "maske": "oldchurch-a.bmp",
+      "stil": "A",
+      "en": "Old Church",
+      "xx": ""
+    },
+    {
+      "maske": "calcareouscave-a.bmp",
+      "stil": "A",
+      "en": "Limestone Cave",
+      "xx": ""
+    },
+    {
+      "maske": "daburimine-a.bmp",
+      "stil": "A",
+      "en": "Dabrye Mine",
+      "xx": ""
+    },
+    {
+      "maske": "urban-a.bmp",
+      "stil": "A",
+      "en": "Urban A District",
+      "xx": ""
+    },
+    {
+      "maske": "hos-a.bmp",
+      "stil": "A",
+      "en": "Acute Neurosis Treatment Facility",
+      "xx": ""
+    },
+    {
+      "maske": "merukaba-a.bmp",
+      "stil": "A",
+      "en": "Tactical Warship Merkabah",
+      "xx": ""
+    },
+    {
+      "maske": "abel-a.bmp",
+      "stil": "A",
+      "en": "Abel's Ark",
+      "xx": ""
+    },
+    {
+      "maske": "ruins-a.bmp",
+      "stil": "A",
+      "en": "Underground Ruins",
+      "xx": ""
+    },
+    {
+      "maske": "lab-a.bmp",
+      "stil": "A",
+      "en": "Isolated Research Facility",
+      "xx": ""
+    },
+    {
+      "maske": "cathedral-a.bmp",
+      "stil": "A",
+      "en": "Archon Cathedral",
+      "xx": ""
+    },
+    {
+      "maske": "elevator-a.bmp",
+      "stil": "B",
+      "en": "Orbital Elevator",
+      "xx": ""
+    },
+    {
+      "maske": "daiichisouth-a.bmp",
+      "stil": "B",
+      "en": "1st Business District - South",
+      "xx": ""
+    },
+    {
+      "maske": "daiichinorth-a.bmp",
+      "stil": "B",
+      "en": "1st Business District - North",
+      "xx": ""
+    },
+    {
+      "maske": "zoharu-a.bmp",
+      "stil": "B",
+      "en": "CAT Testing Ground",
+      "xx": ""
+    },
+    {
+      "maske": "church-a.bmp",
+      "stil": "B",
+      "en": "Old Church in the Forest",
+      "xx": ""
+    },
+    {
+      "maske": "mtdaburi-a.bmp",
+      "stil": "B",
+      "en": "Dabrye Mine",
+      "xx": ""
+    },
+    {
+      "maske": "cave-a.bmp",
+      "stil": "B",
+      "en": "Limestone Cave",
+      "xx": ""
+    },
+    {
+      "maske": "shigaieast-a.bmp",
+      "stil": "B",
+      "en": "A District - East Entrance",
+      "xx": ""
+    },
+    {
+      "maske": "shigainorth-a.bmp",
+      "stil": "B",
+      "en": "A District - North Entrance",
+      "xx": ""
+    },
+    {
+      "maske": "shigaiwest-a.bmp",
+      "stil": "B",
+      "en": "A District - West Entrance",
+      "xx": ""
+    },
+    {
+      "maske": "gatesouth-a.bmp",
+      "stil": "B",
+      "en": "Old Transport Gate - South",
+      "xx": ""
+    },
+    {
+      "maske": "gatenorth-a.bmp",
+      "stil": "B",
+      "en": "Old Transport Gate - North",
+      "xx": ""
+    },
+    {
+      "maske": "under-a.bmp",
+      "stil": "B",
+      "en": "Press ● button to enter this area.",
+      "xx": ""
+    }
+  ],
+  "_unveraendert": "Elsa, Rennes-le-Château, Labyrinthos, Durandal, Michtam, Miltia (Eigennamen, G0); ゾハル・ダンジョン und ミルチア (japanische Reste, im US-Spiel nicht genutzt)"
+}

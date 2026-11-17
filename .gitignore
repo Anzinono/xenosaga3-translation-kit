@@ -1,0 +1,25 @@
+# Game data – NEVER commit (copyrighted, and you need your own discs anyway)
+ISO/
+iso/
+*.iso
+extracted/
+build/
+
+# Exported game text and your translation contain copyrighted text.
+# Keep them local/private. Only the empty templates in vorlagen/ belong in a public repo.
+text/*/
+!text/en/
+text/en/*
+!text/en/.gitkeep
+
+# Patches contain translated game text – do not publish
+patch/*.xdelta
+
+# Ghidra projects (re-creatable)
+re/ghidra/
+
+# Python / local tooling
+__pycache__/
+*.pyc
+.venv/
+.claude/

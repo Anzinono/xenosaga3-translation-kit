@@ -1,19 +1,19 @@
-"""TIM2-Texturen (.tm2) lesen und schreiben.
+"""Read and write TIM2 textures (.tm2).
 
-Aufbau (Standardformat der PS2-SDK-Werkzeuge):
-  0x00 "TIM2", u8 Version, u8 Ausrichtung, u16 Bildanzahl, 8 Byte frei
-  je Bild ein Kopf (0x30 Byte):
-    u32 Gesamtgröße, u32 Palettengröße, u32 Bildgröße, u16 Kopfgröße, u16 Farbanzahl,
-    u8 Bildformat, u8 Mipmaps, u8 Palettentyp, u8 Bildtyp, u16 Breite, u16 Höhe, GS-Register (24 Byte)
-  danach Bilddaten, danach Palette.
+Structure (standard format of the PS2 SDK tools):
+  0x00 "TIM2", u8 version, u8 alignment, u16 image count, 8 bytes free
+  per image a header (0x30 bytes):
+    u32 total size, u32 palette size, u32 image size, u16 header size, u16 colour count,
+    u8 image format, u8 mipmaps, u8 palette type, u8 image type, u16 width, u16 height, GS registers (24 bytes)
+  then image data, then palette.
   Bildtyp 1 = RGBA16, 2 = RGB24, 3 = RGBA32, 4 = 4-Bit-Index, 5 = 8-Bit-Index.
-  Alpha: meist PS2-Skala (0x80 = voll deckend); manche Bilder nutzen 0..0xFF (z. B. logo_ep1/ep2).
-  Ein RGBA32-Bild mit Alpha > 0x80 gilt als 0..0xFF-Skala und wird nicht umgerechnet.
+  Alpha: mostly PS2 scale (0x80 = opaque); some images use 0..0xFF (e.g. logo_ep1/ep2).
+  An RGBA32 image with alpha > 0x80 is treated as 0..0xFF scale and not converted.
 
-Befehle:
-  export  python -I tools/tm2.py export <datei.tm2> --out <ordner>   -> <name>.png (RGBA)
-  import  python -I tools/tm2.py import <datei.tm2> <bild.png> --out <neu.tm2>   (nur Bildtyp 3)
-  test    python -I tools/tm2.py test <datei.tm2> [...]   (lesen -> schreiben muss byte-identisch sein)
+Commands:
+  export  python -I tools/tm2.py export <file.tm2> --out <folder>   -> <name>.png (RGBA)
+  import  python -I tools/tm2.py import <file.tm2> <image.png> --out <new.tm2>   (image type 3 only)
+  test    python -I tools/tm2.py test <file.tm2> [...]   (read -> write must be byte-identical)
 """
 from __future__ import annotations
 
@@ -30,8 +30,8 @@ from pngrgba import read_png_rgba  # noqa: E402
 
 @dataclass
 class Picture:
-    head: int          # Offset des Bildkopfs
-    img_off: int       # Offset der Bilddaten
+    head: int          # offset of the image header
+    img_off: int       # offset of the image data
     img_size: int
     clut_off: int
     clut_size: int
@@ -44,7 +44,7 @@ class Picture:
 
 def parse(data: bytes) -> list[Picture]:
     if data[:4] != b"TIM2":
-        raise ValueError("keine TIM2-Datei")
+        raise ValueError("not a TIM2 file")
     count = struct.unpack_from("<H", data, 6)[0]
     pos = 16 if data[5] == 0 else 128
     pics = []
@@ -59,7 +59,7 @@ def parse(data: bytes) -> list[Picture]:
 
 
 def full_alpha(data: bytes, pic: Picture) -> bool:
-    """True, wenn ein RGBA32-Bild Alpha 0..0xFF statt der PS2-Skala 0..0x80 nutzt."""
+    """True if an RGBA32 image uses alpha 0..0xFF instead of the PS2 scale 0..0x80."""
     return pic.img_type == 3 and max(data[pic.img_off + 3:pic.img_off + pic.img_size:4]) > 0x80
 
 
@@ -75,7 +75,7 @@ def _color(raw: bytes, i: int, kind: int, full: bool = False) -> tuple[int, int,
 
 
 def to_rgba(data: bytes, pic: Picture) -> list[bytes]:
-    """-> Zeilen mit RGBA-Pixeln (Alpha auf 0..255 skaliert)."""
+    """-> rows of RGBA pixels (alpha scaled to 0..255)."""
     img = data[pic.img_off:pic.img_off + pic.img_size]
     w, h = pic.w, pic.h
     if pic.img_type in (1, 2, 3):
@@ -84,7 +84,7 @@ def to_rgba(data: bytes, pic: Picture) -> list[bytes]:
     clut = data[pic.clut_off:pic.clut_off + pic.clut_size]
     kind = pic.clut_type & 0x3F
     pal = [_color(clut, i, kind) for i in range(pic.colors)]
-    if pic.img_type == 5 and not pic.clut_type & 0x80 and pic.colors == 256:   # CSM1 -> logisch
+    if pic.img_type == 5 and not pic.clut_type & 0x80 and pic.colors == 256:   # CSM1 -> logical order
         for g in range(8):
             for j in range(8):
                 k, m = g * 32 + 8 + j, g * 32 + 16 + j
@@ -101,9 +101,9 @@ def to_rgba(data: bytes, pic: Picture) -> list[bytes]:
 
 
 def set_rgba32(data: bytes, pic: Picture, rows: list[bytes]) -> bytes:
-    """Ersetzt die Bilddaten eines RGBA32-Bilds (Alpha 0..255 -> Skala des Originals). Kopf und Größe bleiben."""
+    """Replaces the image data of an RGBA32 image (alpha 0..255 -> scale of the original). Header and size stay."""
     if pic.img_type != 3:
-        raise ValueError("Schreiben nur für Bildtyp 3 (RGBA32)")
+        raise ValueError("writing only for image type 3 (RGBA32)")
     full = full_alpha(data, pic)
     out = bytearray()
     for r in rows:
@@ -111,7 +111,7 @@ def set_rgba32(data: bytes, pic: Picture, rows: list[bytes]) -> bytes:
             p = r[x * 4:x * 4 + 4]
             out += bytes((p[0], p[1], p[2], p[3] if full else (p[3] + 1) // 2))
     if len(out) != pic.img_size:
-        raise ValueError("Bildgröße passt nicht")
+        raise ValueError("image size does not match")
     return data[:pic.img_off] + bytes(out) + data[pic.img_off + pic.img_size:]
 
 
@@ -132,7 +132,7 @@ def cmd_import(args) -> int:
     pic = parse(data)[0]
     w, h, rows = read_png_rgba(Path(args.png))
     if (w, h) != (pic.w, pic.h):
-        raise SystemExit(f"PNG ist {w}x{h}, erwartet {pic.w}x{pic.h}")
+        raise SystemExit(f"PNG is {w}x{h}, expected {pic.w}x{pic.h}")
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_bytes(set_rgba32(data, pic, [bytes(r) for r in rows]))
     return 0
@@ -145,10 +145,10 @@ def cmd_test(args) -> int:
         for pic in parse(data):
             ok = True
             if pic.img_type == 3:
-                # über die skalierte Darstellung zurück (wie beim echten Import)
+                # back via the scaled representation (like a real import)
                 ok = set_rgba32(data, pic, to_rgba(data, pic)) == data
-            print(f"{Path(f).name}: {pic.w}x{pic.h} Typ {pic.img_type}: "
-                  f"{'identisch' if ok else 'ABWEICHEND'}", file=sys.stderr)
+            print(f"{Path(f).name}: {pic.w}x{pic.h} type {pic.img_type}: "
+                  f"{'identical' if ok else 'DIFFERENT'}", file=sys.stderr)
             bad += not ok
     return 1 if bad else 0
 

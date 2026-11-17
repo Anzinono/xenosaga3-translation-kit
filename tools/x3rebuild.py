@@ -1,18 +1,18 @@
-"""Baut ein neues Disc-Image mit geänderten Archivdateien. Dateien dürfen dabei wachsen.
+"""Builds a new disc image with changed archive files. Files may grow.
 
-Das Original wird nur gelesen. Ablauf (siehe docs/formats/iso-neuaufbau.md):
-  - Passt eine Ersatzdatei in ihren alten Sektorplatz, wird sie dort geschrieben.
-  - Sonst wird sie ans Ende ihrer Archivkette gehängt (hinter X3.02 bzw. X3.13/X3.23);
-    alle danach liegenden Sektoren rücken nach hinten.
-  - Angepasst werden: Katalog (Sektor/Größe), ISO-9660-Verzeichniseinträge (Lage/Größe),
-    Volume-Größe, UDF-Dateieinträge, UDF-Partitionslänge, UDF-Integritätstabelle,
-    UDF-Anker am Disc-Ende, jeweils mit neuen Prüfsummen.
-Das Spiel liest eine Kette als zusammenhängenden Sektorbereich ab der LBA des Katalogs
-(SLUS FUN_00188148): Katalog und Datenteile müssen lückenlos hintereinander liegen.
+The original is only read. Procedure (see docs/formats/iso-neuaufbau.md):
+  - If a replacement file fits into its old sector slot, it is written there.
+  - Otherwise it is appended to the end of its archive chain (after X3.02 or X3.13/X3.23);
+    all sectors after it move back.
+  - Updated: catalog (sector/size), ISO 9660 directory records (location/size),
+    volume size, UDF file entries, UDF partition length, UDF integrity table,
+    UDF anchor at the end of the disc, each with new checksums.
+The game reads a chain as one contiguous sector range starting at the catalog's LBA
+(SLUS FUN_00188148): catalog and data parts must follow each other without gaps.
 
-Aufruf:
-  python tools/x3rebuild.py <original.iso> <ordner|-> <ausgabe.iso>
-  <ordner> spiegelt die Spielpfade (z. B. <ordner>/mnu/us/DBC.bin); "-" = keine Änderungen
+Usage:
+  python tools/x3rebuild.py <original.iso> <folder|-> <output.iso>
+  <folder> mirrors the game paths (e.g. <folder>/mnu/us/DBC.bin); "-" = no changes
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ CHUNK = 8 << 20
 # ---------------------------------------------------------------- ISO 9660
 @dataclass
 class DirRec:
-    pos: int      # Byte-Position des Eintrags im Image
+    pos: int      # byte position of the record in the image
     lba: int
     size: int
     name: str
@@ -47,7 +47,7 @@ def read_sector(fh, lba: int, n: int = 1) -> bytes:
 def iso_records(fh) -> tuple[bytes, list[DirRec]]:
     pvd = read_sector(fh, 16)
     if pvd[1:6] != b"CD001":
-        raise SystemExit("Kein ISO-9660-Image")
+        raise SystemExit("Not an ISO 9660 image")
     recs: list[DirRec] = []
 
     def walk(lba: int, length: int, prefix: str) -> None:
@@ -102,9 +102,9 @@ class Chain:
     toc: DirRec
     parts: list[DirRec]
     toc_data: bytearray = field(default_factory=bytearray)
-    end_lba: int = 0                       # erste LBA hinter dem letzten Datenteil
+    end_lba: int = 0                       # first LBA after the last data part
     appended: bytearray = field(default_factory=bytearray)
-    inplace: list[tuple[int, bytes]] = field(default_factory=list)   # (alte LBA, Daten inkl. Füllung)
+    inplace: list[tuple[int, bytes]] = field(default_factory=list)   # (old LBA, data incl. padding)
 
 
 def find_chains(fh, recs: list[DirRec]) -> list[Chain]:
@@ -118,7 +118,7 @@ def find_chains(fh, recs: list[DirRec]) -> list[Chain]:
         lba = toc.lba + -(-toc.size // S)
         for p in parts:
             if p.lba != lba:
-                raise SystemExit(f"{p.name} liegt nicht direkt hinter dem Vorgänger (LBA {p.lba}, erwartet {lba})")
+                raise SystemExit(f"{p.name} does not directly follow its predecessor (LBA {p.lba}, expected {lba})")
             lba += -(-p.size // S)
         c = Chain(toc, parts, bytearray(read_sector(fh, toc.lba, -(-toc.size // S))[:toc.size]), lba)
         chains.append(c)
@@ -143,7 +143,7 @@ def plan(fh, chains: list[Chain], files: dict[str, bytes]) -> list[str]:
                 c.appended += data + b"\0" * (-len(data) % S)
                 log.append(f"{e.path}: ans Kettenende verschoben ({e.size} -> {len(data)} B)")
             if new_sector >= 1 << 24:
-                raise SystemExit("Sektornummer passt nicht in 24 Bit")
+                raise SystemExit("Sector number does not fit into 24 bits")
             c.toc_data[e.index:e.index + 3] = new_sector.to_bytes(3, "little")
             struct.pack_into("<I", c.toc_data, e.index + 3, len(data))
     return log
@@ -155,7 +155,7 @@ def main() -> int:
         return 2
     src, folder, dst = sys.argv[1], sys.argv[2], sys.argv[3]
     if os.path.abspath(src) == os.path.abspath(dst):
-        raise SystemExit("Ausgabe darf nicht das Original sein")
+        raise SystemExit("Output must not be the original")
     files: dict[str, bytes] = {}
     if folder != "-":
         root = Path(folder)
@@ -167,7 +167,7 @@ def main() -> int:
         chains = find_chains(fi, recs)
         log = plan(fi, chains, files)
         if files:
-            raise SystemExit("Nicht in den Katalogen gefunden: " + ", ".join(sorted(files)))
+            raise SystemExit("Not found in the catalogs: " + ", ".join(sorted(files)))
 
         inserts = sorted((c.end_lba, bytes(c.appended)) for c in chains if c.appended)
         points = [p for p, _ in inserts]
@@ -178,11 +178,11 @@ def main() -> int:
             cum.append(acc)
 
         def shift(lba: int) -> int:
-            i = bisect_right(points, lba) - 1     # Einfügung bei p verschiebt Sektoren >= p
+            i = bisect_right(points, lba) - 1     # an insertion at p moves sectors >= p
             return cum[i] if i >= 0 else 0
 
         added = acc
-        # 1) Image mit Einfügungen kopieren
+        # 1) copy the image with insertions
         with open(dst, "wb") as fo:
             pos = 0
             for p, blob in inserts + [(total, b"")]:
@@ -195,10 +195,10 @@ def main() -> int:
                 fo.write(blob)
                 pos = p
 
-        # 2) Metadaten und Daten im neuen Image anpassen
+        # 2) update metadata and data in the new image
         with open(dst, "r+b") as fo:
             for c in chains:
-                # Kataloge späterer Ketten (X3.10/X3.20) rücken mit, wenn davor eingefügt wurde
+                # catalogs of later chains (X3.10/X3.20) move along if something was inserted before them
                 fo.seek((c.toc.lba + shift(c.toc.lba)) * S)
                 fo.write(c.toc_data)
                 for old_lba, data in c.inplace:
@@ -239,7 +239,7 @@ def main() -> int:
                                     o = 80 + 4 * n + 4 * k
                                     struct.pack_into("<I", lv, o, struct.unpack_from("<I", lv, o)[0] + added)
                                 fix_tag(lv); fo.seek(lvid_loc * S); fo.write(lv)
-                # Dateieinträge: in den Sektoren der ISO-Verzeichnisse folgende Partition durchsuchen
+                # file entries: search the partition following the ISO directory sectors
                 udf_fixed = 0
                 old_lbas = {r.lba: r for r in recs}
                 for lba in range(part_start, part_start + 2048):
@@ -267,18 +267,18 @@ def main() -> int:
                         fix_tag(d)
                         fo.seek(lba * S); fo.write(d)
                         udf_fixed += 1
-                # Anker am Disc-Ende ist mitgewandert: Ortsangabe anpassen
+                # the anchor at the end of the disc moved along: update its location
                 new_total = total + added
                 for lba in (new_total - 1, new_total - 257):
                     fo.seek(lba * S)
                     d = bytearray(fo.read(S))
                     if tag_id(d) == 2 and struct.unpack_from("<I", d, 12)[0] in (lba - added,):
                         fix_tag(d, lba); fo.seek(lba * S); fo.write(d)
-                log.append(f"UDF: {udf_fixed} Dateieinträge angepasst")
+                log.append(f"UDF: {udf_fixed} file entries updated")
 
     for line in log:
         print(line, file=sys.stderr)
-    print(f"Fertig: {added} Sektoren ({added * S / 2**20:.1f} MiB) eingefügt -> {dst}", file=sys.stderr)
+    print(f"Done: {added} sectors ({added * S / 2**20:.1f} MiB) inserted -> {dst}", file=sys.stderr)
     return 0
 
 

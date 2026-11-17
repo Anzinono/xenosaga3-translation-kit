@@ -1,18 +1,18 @@
-"""Erzeugt die deutschen Ortseinblendungen (Effekt-Dateien ef/esd/us/*.esd, ef/map/us/*.esp).
+"""Creates the translated location titles (effect files ef/esd/us/*.esd, ef/map/us/*.esp).
 
-Die Schriftzüge liegen als 4-Bit-Deckkraftmasken '<name>-a.bmp' in den Effekt-Containern (docs/grafik.md).
-Für jede Maske aus text/de/grafik_orte.json:
-  1. Original ausmessen (Bereich mit Schrift).
-  2. Englischen Originaltext mit der Ersatzschrift so skalieren, dass er Höhe und Breite des Originals trifft
-     (Schriftgröße + horizontale Stauchung).
-  3. Deutschen Text mit denselben Werten setzen, auf dieselbe Grundlinie und Mitte; zu breite Texte werden
-     zusätzlich gestaucht (max_breite).
-  4. Deckkraft auf den nächstliegenden Paletteneintrag der Maske abbilden (Palette aus der Datei, nie linear annehmen).
-Ein '●' im Text wird durch das Tastensymbol aus der Originalmaske ersetzt.
-Dateigröße und alle anderen Daten bleiben unverändert.
+The lettering is stored as 4-bit opacity masks '<name>-a.bmp' in the effect containers (docs/grafik.md).
+For each mask in text/<lang>/grafik_orte.json:
+  1. Measure the original (area with text).
+  2. Scale the English original text with the substitute font so that it matches the original's height and width
+     (font size + horizontal condensing).
+  3. Set the translated text with the same values, on the same baseline and centre; text that is too wide is
+     condensed further (max_breite).
+  4. Map the opacity to the nearest palette entry of the mask (palette from the file, never assume it is linear).
+A '●' in the text is replaced by the button symbol from the original mask.
+File size and all other data stay unchanged.
 
-Aufruf:  python -I tools/ortstitel.py --out build/de/x3 [--vorschau build/grafik/orte] [--config text/de/grafik_orte.json]
-Braucht Pillow (Benutzer-Pakete, siehe docs/grafik.md).
+Usage:  python -I tools/ortstitel.py --out build/<lang>/x3 [--vorschau build/grafik/orte] [--config text/<lang>/grafik_orte.json]
+Needs Pillow (user site packages, see docs/grafik.md).
 """
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ import eftex  # noqa: E402
 
 try:
     from PIL import Image, ImageDraw, ImageFont
-except ImportError:                                   # python -I blendet die Benutzer-Pakete aus
+except ImportError:                                   # python -I hides user site packages
     sys.path.append(site.getusersitepackages())
     from PIL import Image, ImageDraw, ImageFont
 
@@ -36,7 +36,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "extracted" / "disc1" / "files"
 CONFIG = TEXT_DIR / "grafik_orte.json"
 FONTS = Path("C:/Windows/Fonts")
-SS = 4                                                # Überabtastung beim Rendern
+SS = 4                                                # supersampling when rendering
 BUTTON = "●"
 
 
@@ -47,7 +47,7 @@ def ink_box(idx: list[int], w: int, h: int) -> tuple[int, int, int, int] | None:
 
 
 def button_block(idx: list[int], w: int, h: int) -> tuple[int, int]:
-    """Spaltenbereich des Tastensymbols: dichtester Block 10..20 px breit."""
+    """Column range of the button symbol: densest block 10..20 px wide."""
     cols = [sum(1 for y in range(h) if idx[y * w + x]) for x in range(w)]
     segs, start = [], None
     for x, c in enumerate(cols + [0]):
@@ -58,13 +58,13 @@ def button_block(idx: list[int], w: int, h: int) -> tuple[int, int]:
             start = None
     cand = [(sum(cols[a:b]) / ((b - a) * max(cols[a:b])), a, b) for a, b in segs if 10 <= b - a <= 20]
     if not cand:
-        raise SystemExit("Tastensymbol in der Originalmaske nicht gefunden")
+        raise SystemExit("button symbol not found in the original mask")
     _, a, b = max(cand)
     return a, b
 
 
 class Setter:
-    """Rendert Text in eine Deckkraftfläche (0..1) mit Schriftgröße, Stauchung und Schatten eines Stils."""
+    """Renders text into an opacity area (0..1) with font size, condensing and shadow of a style."""
 
     def __init__(self, style: dict):
         self.fontfile = str(FONTS / style["schrift"])
@@ -75,7 +75,7 @@ class Setter:
         return ImageFont.truetype(self.fontfile, max(1, round(size * SS)))
 
     def layer(self, text: str, size: float, sx: float, gap_px: int = 0) -> tuple[Image.Image, int, list[tuple[int, int]]]:
-        """-> (Graustufenbild ohne Schatten in Zielauflösung, Grundlinie y, Positionen der ●-Lücken [x0, x1])."""
+        """-> (grayscale image without shadow at target resolution, baseline y, positions of the ● gaps [x0, x1])."""
         f = self.font(size)
         parts = text.split(BUTTON)
         asc, desc = f.getmetrics()
@@ -122,7 +122,7 @@ def bbox(a: list[list[float]], thr: float = 0.04) -> tuple[int, int, int, int] |
 
 
 def fit(setter: Setter, en: str, box: tuple[int, int, int, int], gap_px: int) -> tuple[float, float, int]:
-    """Schriftgröße und Stauchung, mit denen der englische Text den Originalbereich trifft; dazu Grundlinien-Versatz."""
+    """Font size and condensing with which the English text matches the original area; plus baseline offset."""
     target_h = box[3] - box[1]
     target_w = box[2] - box[0]
     lo, hi = 4.0, 64.0
@@ -140,8 +140,8 @@ def fit(setter: Setter, en: str, box: tuple[int, int, int, int], gap_px: int) ->
     sx = target_w / (bb[2] - bb[0])
     img, base, _ = setter.layer(en, size, sx, gap_px)
     bb = bbox(setter.with_shadow(img))
-    top_from_base = bb[1] - base                       # Abstand Oberkante Schrift -> Grundlinie (negativ)
-    return size, sx, box[1] - top_from_base             # Grundlinie im Zielbild
+    top_from_base = bb[1] - base                       # distance top of text -> baseline (negative)
+    return size, sx, box[1] - top_from_base             # baseline in the target image
 
 
 def make_mask(entry: dict, setter: Setter, idx: list[int], w: int, h: int, max_w: int) -> tuple[list[float], dict]:
@@ -156,7 +156,7 @@ def make_mask(entry: dict, setter: Setter, idx: list[int], w: int, h: int, max_w
     a = setter.with_shadow(img)
     bb = bbox(a)
     width = bb[2] - bb[0]
-    if width > max_w:                                   # zu breit: zusätzlich stauchen
+    if width > max_w:                                   # too wide: condense further
         sx2 = sx * max_w / width
         img, base, holes = setter.layer(entry[LANG], size, sx2, gap_px)
         a = setter.with_shadow(img)
@@ -172,15 +172,15 @@ def make_mask(entry: dict, setter: Setter, idx: list[int], w: int, h: int, max_w
         ty = y + oy
         if not 0 <= ty < h:
             if any(v > 0.25 for v in row):
-                raise SystemExit(f"{entry['maske']}: Text ragt oben/unten aus der Textur")
+                raise SystemExit(f"{entry['maske']}: text sticks out of the texture at the top/bottom")
             continue
         for x, v in enumerate(row):
             tx = x + ox
             if 0 <= tx < w and v > 0:
                 out[ty * w + tx] = max(out[ty * w + tx], v)
             elif v > 0.25:
-                raise SystemExit(f"{entry['maske']}: Text ragt seitlich aus der Textur")
-    if btn:                                             # Tastensymbol aus dem Original einsetzen
+                raise SystemExit(f"{entry['maske']}: text sticks out of the texture at the side")
+    if btn:                                             # insert the button symbol from the original
         bw = btn[1] - btn[0]
         for hx0, hx1 in holes:
             x0 = ox + round((hx0 + hx1) / 2 - bw / 2)
@@ -195,15 +195,15 @@ def make_mask(entry: dict, setter: Setter, idx: list[int], w: int, h: int, max_w
 
 
 def to_indices(alpha: list[float], pal_alpha: list[int]) -> list[int]:
-    """Deckkraft 0..1 -> Index mit nächstliegender Palettendeckkraft (Palette aus der Datei)."""
+    """Opacity 0..1 -> index with the nearest palette opacity (palette from the file)."""
     lut = [min(range(len(pal_alpha)), key=lambda i: abs(pal_alpha[i] - v)) for v in range(256)]
     return [lut[min(255, round(a * 255))] for a in alpha]
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--out", required=True, help="Zielordner (entspricht der Archivwurzel, z. B. build/de/x3)")
-    ap.add_argument("--vorschau", help="Ordner für Vorschaubilder")
+    ap.add_argument("--out", required=True, help="target folder (corresponds to the archive root, e.g. build/<lang>/x3)")
+    ap.add_argument("--vorschau", help="folder for preview images")
     ap.add_argument("--config", default=str(CONFIG))
     ap.add_argument("--src", default=str(SRC))
     args = ap.parse_args()
@@ -213,7 +213,7 @@ def main() -> int:
     setters = {k: Setter(v) for k, v in cfg["stile"].items()}
     files = sorted(src.glob("ef/esd/us/*.esd")) + sorted(src.glob("ef/map/us/*.esp"))
     if not files:
-        raise SystemExit(f"Keine Effekt-Dateien unter {src}/ef – vorher mit x3extract.py entpacken")
+        raise SystemExit(f"No effect files under {src}/ef – extract them with x3extract.py first")
     cache: dict[tuple[str, bytes], list[float]] = {}
     previews: dict[str, tuple[list[int], list[float], int, int, dict]] = {}
     changed = 0
@@ -234,25 +234,25 @@ def main() -> int:
             new = eftex.set_indices(new, r, to_indices(cache[key], pal))
         if new != data:
             if len(new) != len(data):
-                raise SystemExit(f"{f.name}: Größe verändert")
+                raise SystemExit(f"{f.name}: size changed")
             dst = out / f.relative_to(src)
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_bytes(new)
             changed += 1
     missing = sorted(set(entries) - set(previews))
     if missing:
-        raise SystemExit(f"Masken aus der Konfiguration nicht gefunden: {missing}")
-    print(f"Ortseinblendungen: {len(previews)} Masken, {changed} Dateien geschrieben", file=sys.stderr)
+        raise SystemExit(f"Masks from the configuration not found: {missing}")
+    print(f"Location titles: {len(previews)} masks, {changed} files written", file=sys.stderr)
     for name, (_, _, _, _, info) in sorted(previews.items()):
-        print(f"  {name:24} {entries[name]['de']!r:42} Größe {info['groesse']}, Stauchung {info['stauchung']}, "
-              f"Breite {info['breite']}", file=sys.stderr)
+        print(f"  {name:24} {entries[name][LANG]!r:42} size {info['groesse']}, condensing {info['stauchung']}, "
+              f"width {info['breite']}", file=sys.stderr)
     if args.vorschau:
         write_preview(Path(args.vorschau), previews, entries)
     return 0
 
 
 def write_preview(folder: Path, previews: dict, entries: dict) -> None:
-    """Original und neu untereinander, weiß auf dunkelgrau, doppelte Größe."""
+    """Original and new one below the other, white on dark grey, double size."""
     folder.mkdir(parents=True, exist_ok=True)
     tiles = []
     for name in [e for e in entries if e in previews]:
@@ -273,7 +273,7 @@ def write_preview(folder: Path, previews: dict, entries: dict) -> None:
         sheet.paste(t, (0, y))
         y += t.height
     sheet = sheet.resize((512, hgt * 2), Image.NEAREST)
-    # in handliche Teile schneiden
+    # cut into handy parts
     part, y0 = 1, 0
     while y0 < sheet.height:
         sheet.crop((0, y0, 512, min(sheet.height, y0 + 1400))).save(folder / f"orte_vorschau_{part}.png")

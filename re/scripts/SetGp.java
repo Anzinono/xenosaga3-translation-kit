@@ -1,5 +1,5 @@
-// Setzt den gp-Registerwert für den gesamten Codebereich (crt0: daddu gp, a0, zero mit a0 = 0x5571F0).
-// Aufruf (vor der Analyse): ... -preScript SetGp.java [0x5571f0]
+// Sets the gp register value for the whole code range (crt0: daddu gp, a0, zero with a0 = 0x5571F0).
+// Usage (before analysis): ... -preScript SetGp.java [0x5571f0]
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.lang.Register;
 import ghidra.program.model.mem.MemoryBlock;

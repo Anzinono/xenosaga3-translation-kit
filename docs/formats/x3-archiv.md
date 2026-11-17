@@ -1,64 +1,62 @@
-# X3-Archive (Kataloge X3.00 / X3.10 / X3.20)
+# X3 archives (catalogs X3.00 / X3.10 / X3.20)
 
-Selbst hergeleitet aus Hexdumps, geprüft gegen die Lybac-Listen in
+Derived from hex dumps and verified against the Lybac lists in
 [Xenosaga3PythonExtractor/lba](https://github.com/LinuxJessi/Xenosaga3PythonExtractor/tree/main/lba)
-(alle Stichproben byte-genau identisch, inkl. Index-Spalte). Implementierung: `tools/x3toc.py`.
+(all samples byte-identical, incl. the index column). Implementation: `tools/x3toc.py`.
 
-## Ketten
+## Chains
 
-| Katalog | Datenteile | Disc | Inhalt |
+| Catalog | Data parts | Disc | Content |
 |---|---|---|---|
-| `X3.00` (55 Sektoren) | `X3.01` + `X3.02` | beide (identisch) | Menüs, Skripte, Modelle, Effekte, Sound, Gesichter |
-| `X3.10` (26 Sektoren) | `X3.11` + `X3.12` + `X3.13` | 1 | Zwischensequenzen, Filme, Sprachausgabe |
-| `X3.20` (13 Sektoren) | `X3.21` + `X3.22` + `X3.23` | 2 | Zwischensequenzen, Filme, Sprachausgabe |
+| `X3.00` (55 sectors) | `X3.01` + `X3.02` | both (identical) | menus, scripts, models, effects, sound, faces |
+| `X3.10` (26 sectors) | `X3.11` + `X3.12` + `X3.13` | 1 | cutscenes, movies, voice |
+| `X3.20` (13 sectors) | `X3.21` + `X3.22` + `X3.23` | 2 | cutscenes, movies, voice |
 
-Die Datenteile bilden je einen zusammenhängenden Adressraum (X3.x1, dann X3.x2, …).
-Der Katalog zählt seine eigenen Sektoren mit:
-`Offset in der Kette = (Sektor − Katalogsektoren) × 2048`.
+Each chain of data parts forms one contiguous address space (X3.x1, then X3.x2, …).
+The catalog counts its own sectors:
+`offset in chain = (sector − catalog sectors) × 2048`.
 
-## Katalogformat
-
-```
-Byte 0      Katalogsektoren (u8)
-ab Byte 1   Einträge bis zum ersten 00-Byte, danach Füllung
-            ("MONOLITHSOFT Xenosaga Episode.2" wiederholt)
-```
-
-**Verzeichnis** – erstes Byte hat Bit 7 gesetzt:
+## Catalog format
 
 ```
-[0x80 | reclen] [up] [ctrl] [Namensdaten]       reclen = Gesamtlänge des Eintrags
-```
-- `up`: so viele Ebenen zuerst nach oben gehen.
-- Der Name wird gegen den vorherigen Namen **auf derselben Ebene** komprimiert (siehe ctrl).
-
-**Datei:**
-
-```
-[reclen] [ctrl] [Namensdaten] [Sektor u24 LE] [Größe u32 LE]
+byte 0      number of catalog sectors (u8)
+from byte 1 entries up to the first 00 byte, then padding
+            ("MONOLITHSOFT Xenosaga Episode.2" repeated)
 ```
 
-**Namenskompression (ctrl):**
-- `ctrl == 0`: Namensdaten = vollständiger Name (mit 00 am Ende).
-- sonst: `start = len(alter Name) − (ctrl >> 4) − 1`.
-  - Enden die Namensdaten auf `00`: `neu = alt[:start] + daten`, der Rest wird abgeschnitten.
-  - sonst: Die Daten überschreiben `alt` ab `start`, die Zeichen danach bleiben stehen.
-- Das untere Nibble von ctrl entspricht der Datenlänge (redundant, wird nicht benötigt).
+**Directory** – first byte has bit 7 set:
 
-Beispiel: `s000100.xep` → Eintrag `03 61 "3"` → start = 11 − 6 − 1 = 4 → `s000300.xep`.
+```
+[0x80 | reclen] [up] [ctrl] [name data]       reclen = total length of the entry
+```
+- `up`: go up this many levels first.
+- The name is compressed against the previous name **on the same level** (see ctrl).
 
-Die „INDEX“-Spalte der Lybac-Listen ist die Byte-Position des Sektorfelds im Katalog.
-Das ist nützlich für den späteren Repacker: Dort werden Sektor und Größe beim Neuschreiben angepasst.
+**File:**
 
-## Prüfung (`tools/x3stats.py`)
+```
+[reclen] [ctrl] [name data] [sector u24 LE] [size u32 LE]
+```
 
-| Katalog | Dateien | belegt / Kette | außerhalb | Überlappungen | doppelte Pfade |
+**Name compression (ctrl):**
+- `ctrl == 0`: name data = complete name (terminated by 00).
+- otherwise: `start = len(previous name) − (ctrl >> 4) − 1`.
+  - If the name data ends with `00`: `new = previous[:start] + data`, the rest is cut off.
+  - otherwise: the data overwrites `previous` from `start`, characters after it remain.
+- The low nibble of ctrl equals the data length (redundant, not needed).
+
+Example: `s000100.xep` → entry `03 61 "3"` → start = 11 − 6 − 1 = 4 → `s000300.xep`.
+
+The "INDEX" column of the Lybac lists is the byte position of the sector field in the catalog – which is exactly where
+`tools/x3rebuild.py` writes the new sector and size.
+
+## Verification (`tools/x3stats.py`)
+
+| Catalog | Files | used / chain | outside | overlaps | duplicate paths |
 |---|---|---|---|---|---|
 | X3.00 | 9 867 | 1 559 / 1 571 MiB | 0 | 0 | 0 |
 | X3.10 | 3 649 | 2 141 / 2 145 MiB | 0 | 0 | 0 |
 | X3.20 | 1 709 | 2 708 / 2 710 MiB | 0 | 0 | 0 |
 
-## Für den Repacker relevant (offen)
-
-- Ausrichtung: Dateien beginnen auf Sektorgrenzen (2048 Byte), teils mit größeren Lücken. Ist mehr Platz nötig, kann eine Datei verschoben oder ans Kettenende gehängt werden. Dann müssen nur Sektor und Größe im Katalog angepasst werden; der Katalog selbst ändert seine Länge nicht.
-- Ob das Spiel die Katalogsektorzahl (Byte 0) oder feste Größen im ELF erwartet, ist noch zu prüfen. Relevant wird das nur, wenn der Katalog wächst.
+The archives are packed without gaps (only the remainder up to the next sector boundary is free). Files that grow are
+therefore moved to the end of their chain – see [iso-neuaufbau.md](iso-neuaufbau.md).

@@ -1,20 +1,20 @@
-"""Parser für die Xenosaga-III-Kataloge X3.00 / X3.10 / X3.20.
+"""Parser for the Xenosaga III catalogs X3.00 / X3.10 / X3.20.
 
-Format (selbst hergeleitet, siehe docs/formats/x3-archiv.md):
+Format (derived from hex dumps, see docs/formats/x3-archiv.md):
 
-  Byte 0            Größe des Katalogs in Sektoren (2048 Byte). Der Katalog
-                    belegt die ersten Sektoren des Adressraums seiner Kette.
-  danach Einträge:
+  byte 0            size of the catalog in sectors (2048 bytes). The catalog
+                    occupies the first sectors of its chain's address space.
+  then entries:
     Verzeichnis     [0x80 | reclen] [up] [?] [Name] 00
-                    up = Anzahl Ebenen, die vorher nach oben gegangen wird
-    Datei           [reclen] [ctrl] [Namensdaten] [Sektor u24] [Größe u32]
-                    Neuer Name = alter Name, ab Position len(alt) - (ctrl>>4) - 1
-                    mit den Namensdaten überschrieben. Endet die Namensdaten auf 00,
-                    wird danach abgeschnitten (Name wird kürzer/länger).
+                    up = number of levels to go up first
+    file            [reclen] [ctrl] [name data] [sector u24] [size u32]
+                    new name = previous name, from position len(prev) - (ctrl>>4) - 1
+                    overwritten with the name data. If the name data ends with 00,
+                    the rest is cut off (the name gets shorter/longer).
                     ctrl == 0 bedeutet: komplett neuer Name.
 
-Aufruf:
-  python tools/x3toc.py <Katalogdatei> [--csv ausgabe.csv]
+Usage:
+  python tools/x3toc.py <catalog file> [--csv output.csv]
 """
 from __future__ import annotations
 
@@ -29,11 +29,11 @@ SECTOR = 2048
 
 @dataclass
 class Entry:
-    path: str          # Pfad im Spiel, z. B. \evt\s000100.xep
+    path: str          # path in the game, e.g. \evt\s000100.xep
     sector: int        # Sektor laut Katalog (inkl. Katalogsektoren)
-    offset: int        # Byte-Offset in der Datenkette (X3.x1 + X3.x2 + ...)
-    size: int          # Größe in Bytes
-    index: int         # Byte-Position des Sektorfelds im Katalog (= Lybac "INDEX")
+    offset: int        # byte offset in the data chain (X3.x1 + X3.x2 + ...)
+    size: int          # size in bytes
+    index: int         # byte position of the sector field in the catalog (= Lybac "INDEX")
 
 
 class TocError(Exception):
@@ -41,13 +41,13 @@ class TocError(Exception):
 
 
 def _apply(prev: str, ctrl: int, namedata: bytes, pos: int) -> str:
-    """Neuen Namen aus dem vorherigen Namen und den komprimierten Namensdaten bilden."""
+    """Build the new name from the previous name and the compressed name data."""
     if ctrl == 0:
         prev, start = "", 0
     else:
         start = len(prev) - (ctrl >> 4) - 1
         if start < 0:
-            raise TocError(f"Ungültige Namensposition bei 0x{pos:X} (ctrl 0x{ctrl:02X}, alt '{prev}')")
+            raise TocError(f"Invalid name position at 0x{pos:X} (ctrl 0x{ctrl:02X}, previous '{prev}')")
     if namedata.endswith(b"\0"):
         return prev[:start] + namedata[:-1].decode("ascii")
     part = namedata.decode("ascii")
@@ -63,13 +63,13 @@ def parse_toc(data: bytes) -> list[Entry]:
     while pos < len(data):
         b = data[pos]
         if b == 0:
-            break  # Ende der Einträge (danach folgt Füllung)
+            break  # end of entries (padding follows)
         if b & 0x80:
             reclen = b & 0x7F
             up, ctrl = data[pos + 1], data[pos + 2]
             if up > len(dirs):
-                raise TocError(f"Zu viele Ebenen nach oben ({up}) bei 0x{pos:X}")
-            # Vorheriger Name auf derselben Ebene (Geschwister), Basis für die Kompression
+                raise TocError(f"Too many levels up ({up}) at 0x{pos:X}")
+            # previous name on the same level (sibling), base for the compression
             sibling = dirs[-up] if up else ""
             if up:
                 del dirs[-up:]
@@ -91,7 +91,7 @@ def parse_toc(data: bytes) -> list[Entry]:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("toc")
-    ap.add_argument("--csv", help="Einträge als CSV schreiben")
+    ap.add_argument("--csv", help="write entries as CSV")
     args = ap.parse_args()
     with open(args.toc, "rb") as fh:
         entries = parse_toc(fh.read())
@@ -104,7 +104,7 @@ def main() -> int:
     else:
         for e in entries:
             print(f"{e.offset:08X}|{e.size:08X}|{e.index:08X}|{e.path}")
-    print(f"{len(entries)} Einträge", file=sys.stderr)
+    print(f"{len(entries)} entries", file=sys.stderr)
     return 0
 
 

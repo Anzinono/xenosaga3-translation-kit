@@ -1,24 +1,24 @@
 """
-Xenosaga III - Untertitel-Exporter
+Xenosaga III - subtitle exporter
 
-Liest die Untertiteldateien (evt/us und mov/us, beide Discs) und exportiert
-sie als CSV: eine Zeile pro Untertitel. Formatbeschreibung:
+Reads the subtitle files (evt/us and mov/us, both discs) and exports
+them as CSV: one row per subtitle. Format description:
 docs/formats/untertitel.md
 
-Aufruf (im Projekt-Root):
+Usage (in the project root):
     python pySkript/subtitle_export.py
     python pySkript/subtitle_export.py --dir extracted/disc1/files/evt/us --out text/en/untertitel.csv
 
-Spalten:
-    datei      Pfad relativ zum Ordner "files" (z. B. disc1/evt/us/s000100.txt)
-    nr         laufende Nummer des Untertitels in der Datei
-    zeile      Zeilennummer der Startzeile (1-basiert) -> wird zum Zurückschreiben gebraucht
-    start      Startzeit, wie in der Datei (z. B. 00:22:18, 1054, +00:00:15)
-    ende       Endzeit oder Dauer aus der Folgezeile (z. B. +00:01:20, 1140), leer falls keine
-    text_en    Originaltext; "\\n" (Backslash + n) = Zeilenumbruch im Spiel
-    zeilen     Anzahl Textzeilen im Spiel
-    max_zeichen  längste Textzeile in Zeichen (für die Längenprüfung)
-    text_de    leer, für die Übersetzung
+Columns:
+    datei        path relative to the "files" folder (e.g. disc1/evt/us/s000100.txt)
+    nr           running number of the subtitle in the file
+    zeile        line number of the start line (1-based) -> needed for writing back
+    start        start time as in the file (e.g. 00:22:18, 1054, +00:00:15)
+    ende         end time or duration from the following line (e.g. +00:01:20, 1140), empty if none
+    text_en      original text; "\\n" (backslash + n) = line break in the game
+    zeilen       number of text lines in the game
+    max_zeichen  longest text line in characters (for the length check)
+    text_<lang>  empty, for the translation
 """
 
 import argparse
@@ -26,12 +26,12 @@ import csv
 import os
 from pathlib import Path
 
-# Zielsprache wie in tools/sprache.py (Umgebungsvariable XS3_LANG, Standard de)
+# target language as in tools/sprache.py (environment variable XS3_LANG, default de)
 COL = f"text_{os.environ.get('XS3_LANG', 'de').strip().lower()}"
 
-ENCODING = "cp1252"          # siehe docs/formats/font.md
-SKIP_WORDS = {"end", "mono"}  # Steuerzeilen ohne Text
-LINE_BREAK = "\\n"            # zwei Zeichen: Backslash + n
+ENCODING = "cp1252"          # see docs/formats/font.md
+SKIP_WORDS = {"end", "mono"}  # control lines without text
+LINE_BREAK = "\\n"            # two characters: backslash + n
 
 DEFAULT_DIRS = [
     "extracted/disc1/files/evt/us",
@@ -42,7 +42,7 @@ DEFAULT_DIRS = [
 
 
 def split_line(line: str) -> tuple[str, str | None]:
-    """Zeile in (Zeit, Text) teilen. Text ist None, wenn die Zeile keinen TAB hat."""
+    """Split a line into (time, text). text is None if the line has no TAB."""
     if "\t" in line:
         time, text = line.split("\t", 1)
         return time.strip(), text
@@ -50,22 +50,22 @@ def split_line(line: str) -> tuple[str, str | None]:
 
 
 def parse_file(path: Path) -> list[dict]:
-    """Alle Untertitel einer Datei. Befehlszeilen ($...) und Endzeilen werden nicht exportiert."""
+    """All subtitles of a file. Command lines ($...) and end lines are not exported."""
     lines = path.read_bytes().decode(ENCODING).splitlines()
     subs: list[dict] = []
     current: dict | None = None
     for nr, line in enumerate(lines, start=1):
         time, text = split_line(line)
         if not time and text is None:
-            continue                                # Leerzeile
+            continue                                # blank line
         if text is None:
             if time.lower() in SKIP_WORDS:
                 current = None
             elif current is not None and not current["ende"]:
-                current["ende"] = time               # Endzeit/Dauer des laufenden Untertitels
+                current["ende"] = time               # end time/duration of the current subtitle
             continue
         if text.startswith("$"):
-            current = None                           # Darstellungsbefehle bleiben unverändert
+            current = None                           # display commands stay unchanged
             continue
         parts = text.split(LINE_BREAK)
         current = {
@@ -83,7 +83,7 @@ def parse_file(path: Path) -> list[dict]:
 
 
 def file_label(path: Path) -> str:
-    """Kurzer, eindeutiger Pfad ab dem Disc-Ordner, z. B. disc1/evt/us/s000100.txt."""
+    """Short, unique path from the disc folder, e.g. disc1/evt/us/s000100.txt."""
     parts = path.parts
     if "files" in parts:
         i = parts.index("files")
@@ -92,8 +92,8 @@ def file_label(path: Path) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Untertitel nach CSV exportieren")
-    parser.add_argument("--dir", action="append", help="Quellordner (mehrfach möglich)")
+    parser = argparse.ArgumentParser(description="Export subtitles to CSV")
+    parser.add_argument("--dir", action="append", help="source folder (can be given several times)")
     parser.add_argument("--out", default="text/en/untertitel.csv")
     args = parser.parse_args()
 
@@ -104,14 +104,14 @@ def main() -> None:
     files = sorted(p for d in dirs if d.is_dir() for p in d.rglob("*.txt") if p.is_file())
     missing = [str(d) for d in dirs if not d.is_dir()]
     if missing:
-        print("Ordner nicht gefunden (übersprungen):", ", ".join(missing))
+        print("Folder not found (skipped):", ", ".join(missing))
     if not files:
-        print("Keine Untertiteldateien gefunden.")
+        print("No subtitle files found.")
         return
 
     rows = 0
     without_subs = []
-    with out.open("w", newline="", encoding="utf-8-sig") as f:  # utf-8-sig = Excel-freundlich
+    with out.open("w", newline="", encoding="utf-8-sig") as f:  # utf-8-sig = Excel-friendly
         writer = csv.DictWriter(
             f,
             fieldnames=["datei", "nr", "zeile", "start", "ende", "text_en", "zeilen", "max_zeichen", COL],
@@ -127,9 +127,9 @@ def main() -> None:
                 writer.writerow(sub)
             rows += len(subs)
 
-    print(f"{rows} Untertitel aus {len(files)} Dateien nach {out} exportiert.")
+    print(f"{rows} subtitles from {len(files)} files exported to {out}.")
     if without_subs:
-        print(f"{len(without_subs)} Dateien ohne Untertitel:", ", ".join(without_subs[:10]))
+        print(f"{len(without_subs)} files without subtitles:", ", ".join(without_subs[:10]))
 
 
 if __name__ == "__main__":

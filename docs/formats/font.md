@@ -1,48 +1,61 @@
-# Font und Zeichenkodierung
+# Font and character encoding
 
-**Ergebnis: Umlaute und ß funktionieren ohne Font-Änderung.** Texte werden in Windows-1252 kodiert. Die US-Version macht das schon selbst: „Möbius Hotel“, „Dämmerung“, „Floßhilde“ (`cf\us\1220.sb`, `1230.sb`, `1300.sb`).
+**Result: Western European characters work without changing the font.** Text is encoded in Windows-1252. The US release already
+does this itself: "Möbius Hotel", "Dämmerung", "Floßhilde" (`cf\us\1220.sb`, `1230.sb`, `1300.sb`).
 
-## Dateien
+## Files
 
-`\mnu\us\font0.bin` und `font1.bin`, je 494 592 Byte (0x78C00). Die beiden Dateien unterscheiden sich, haben aber dieselbe Breitentabelle.
-Export: `python -I tools/xsfont.py <font.bin> --out <ordner>` → `ebene0-3.png`, `breiten.csv`.
+`\mnu\us\font0.bin` and `font1.bin`, 494 592 bytes each (0x78C00). The two files differ but share the same width table.
+Export: `python -I tools/xsfont.py <font.bin> --out <folder>` → `ebene0-3.png` (planes), `breiten.csv` (widths).
 
-| Bereich | Inhalt |
+| Range | Content |
 |---|---|
-| `0x00000–0x77FFF` | 1 024 Glyphen × 20 × 24 Pixel, 1 Byte pro Pixel. Jedes Byte enthält **4 Ebenen à 2 Bit** (Ebene n = Bits 2n…2n+1, Graustufe 0–3). Insgesamt also 4 096 Glyphen. |
-| `0x78000–0x783FF` | Breitentabelle: 512 × (links, rechts) in Pixeln für die Glyphen 0–511 von Ebene 0. Breite = rechts − links + 1 (`FUN_00185770`). |
-| `0x78400–0x78BFF` | 2 KiB Zusatzdaten, 4-Bit-Werte, werden über eine Tabelle expandiert und als eigene Textur hochgeladen (`FUN_00181fa0`). Vermutlich Tasten-Icons. Noch offen. |
+| `0x00000–0x77FFF` | 1 024 glyphs × 20 × 24 pixels, 1 byte per pixel. Each byte holds **4 planes of 2 bits** (plane n = bits 2n…2n+1, gray level 0–3), so 4 096 glyphs in total. |
+| `0x78000–0x783FF` | width table: 512 × (left, right) in pixels for glyphs 0–511 of plane 0. Width = right − left + 1 (`FUN_00185770`). |
+| `0x78400–0x78BFF` | 2 KiB of extra data, 4-bit values expanded via a table and uploaded as a separate texture (`FUN_00181fa0`), probably button icons. |
 
-Ebene 0: Symbole und Satzzeichen in JIS-Reihenfolge, Ziffern, A–Z, a–z, ab Glyphe 256 **Windows-1252 0x80–0xFF**, danach Griechisch, Kyrillisch, Rahmenlinien, ①–⑳, römische Zahlen. Ab Glyphe 576 folgt eine zweite, teils mit Platzhaltern gefüllte Kopie.
-Ebenen 1–3: japanische Kanji (Überbleibsel der JP-Fassung).
+Plane 0: symbols and punctuation in JIS order, digits, A–Z, a–z, from glyph 256 **Windows-1252 0x80–0xFF**, then Greek, Cyrillic,
+box drawing, ①–⑳, Roman numerals. From glyph 576 a second, partly placeholder-filled copy follows.
+Planes 1–3: Japanese kanji (leftovers from the Japanese release).
 
-## Zeichenkodierung im Text-Renderer (`FUN_00184b30`, SLUS_213.89)
+## Encoding in the text renderer (`FUN_00184b30`, SLUS_213.89)
 
-Analysiert mit Ghidra. **Wichtig:** Das Projekt braucht den gp-Wert `0x5571F0` (`re/scripts/SetGp.java`, siehe `docs/werkzeuge.md`).
+Analysed with Ghidra (requires the gp value `0x5571F0`, see `docs/werkzeuge.md`).
 
-| Byte(s) | Bedeutung |
+| Byte(s) | Meaning |
 |---|---|
-| `0x00` | Ende |
-| `0x01–0x1F` | Steuercodes mit Parametern (Position, Farbe `0x0C`, Zahlen `0x11`, Unterstring `0x16`, Callback `0x17` …). Bei der Reinsertion unverändert lassen. |
-| `0x24` `$` | Sonderbehandlung (`FUN_00184090`), vermutlich Variablen/Befehle |
+| `0x00` | end |
+| `0x01–0x1F` | control codes with parameters (position, colour `0x0C`, numbers `0x11`, substring `0x16`, callback `0x17` …) – keep unchanged |
+| `0x24` `$` | special handling (`FUN_00184090`), probably variables/commands |
 | `0x20–0x7F` | ASCII |
-| `0x80–0xFF` + nächstes Byte | Nur wenn `FUN_00181e48(b1, b2)` = 1: 2-Byte-EUC-Zeichen. Das gilt nur für bestimmte Paare mit erstem Byte `A1`, `A2`, `A3`, `A4`, `A6`, `AD` (z. B. `A6 B2` griechisch, `AD B5` eingekreiste Zahl). |
-| `0x80–0xFF` sonst | **Einzelbyte → Glyphe `Byte + 0x80`** = Windows-1252-Zeichen |
+| `0x80–0xFF` + next byte | only if `FUN_00181e48(b1, b2)` = 1: 2-byte EUC character. This applies only to certain pairs whose first byte is `A1`, `A2`, `A3`, `A4`, `A6` or `AD` (e.g. `A6 B2` Greek, `AD B5` circled number). |
+| `0x80–0xFF` otherwise | **single byte → glyph `byte + 0x80`** = Windows-1252 character |
 
-### Umsetzung in den Tools
+### Implementation in the tools
 
-`tools/sbtext.py` enthält `game_pair_ok()` (Nachbau von `FUN_00181e48`), `decode_game()` und `encode_de()`, die von allen Text-Tools genutzt werden:
-- **Export:** Gültige 2-Byte-Paare erscheinen als echtes Zeichen (EUC-JP), z. B. `○ □ △ × ↑ → Σ`. Alles andere wird als Windows-1252 ausgegeben.
-- **Import:** Windows-1252. Zeichen außerhalb davon sind nur erlaubt, wenn das Spiel sie als 2-Byte-Paar darstellt. Die Einzelbytes `A1–A4`, `A6` und `AD` werden abgelehnt.
-- Als „japanisch“ (nicht exportiert) gilt ein String nur bei Hiragana/Katakana (EUC `A4`/`A5`), Kanji (ab `B0`) oder Shift-JIS. Symbole aus den Zeilen `A1–A3`, `A6` und `AD` zählen nicht dazu. Dadurch wurden in den Skripten 125 echte Dialoge mit Tastensymbolen wiedergefunden (z. B. „Press <○>!“, „Erde Kaiser Σ“).
+`tools/sbtext.py` contains `game_pair_ok()` (a re-implementation of `FUN_00181e48`), `decode_game()` and `encode_de()`, used by all text tools:
+- **Export:** valid 2-byte pairs appear as the real character (EUC-JP), e.g. `○ □ △ × ↑ → Σ`. Everything else is shown as Windows-1252.
+- **Import:** Windows-1252. Characters outside it are only allowed if the game renders them as a 2-byte pair. The single bytes
+  `A1–A4`, `A6` and `AD` are rejected.
+- A string counts as Japanese (not exported) only if it contains hiragana/katakana (EUC `A4`/`A5`), kanji (from `B0`) or Shift-JIS.
+  Symbols from rows `A1–A3`, `A6` and `AD` do not count.
 
-### Regeln für die deutsche Übersetzung
+### Rules for translations
 
-- Kodierung: **Windows-1252** (cp1252). Erlaubt sind u. a. `ä ö ü Ä Ö Ü ß „ “ ‚ ‘ – — … é`.
-- **Nicht verwenden:** die Bytes `A1–A4`, `A6` und `AD` (cp1252: `¡ ¢ £ ¤ ¦` und weiches Trennzeichen). Folgt ihnen ein passendes Byte, liest das Spiel beide als ein japanisches Zeichen. Das Prüfskript für die Übersetzung muss sie ablehnen.
-- Die Breiten aller Windows-1252-Glyphen sind gesetzt (ä 9 px, Ö 14 px, ß 9 px …). Die Zeilenlänge muss trotzdem in Pixeln geprüft werden, nicht in Zeichen: `extracted/font0/breiten.csv`.
+- Encoding: **Windows-1252** (cp1252), e.g. `à â ç é è ê ë î ï ô œ ù û ü ÿ ñ ¿ ä ö ß å æ ø „ “ ‚ ‘ « » – — … €`.
+- **Do not use** the bytes `A1–A4`, `A6`, `AD` (cp1252: `¡ ¢ £ ¤ ¦` and the soft hyphen). If they are followed by a suitable byte,
+  the game reads both as one Japanese character. The import rejects them. (`¡` is a problem for Spanish – use `!` or rephrase.)
+- The widths of all Windows-1252 glyphs are set. Line length must still be checked in pixels, not characters
+  (`tools/pixelbreite.py`, `build.py` does this for dialogue and database).
 
-## Offen
+### Other languages
 
-- Andere Textwege (Untertitel `evt\us`, `mov\us`, Kampftexte) eventuell mit eigener Ausgaberoutine; per Test in PCSX2 bestätigen.
-- Bedeutung von `font0` vs. `font1` (Parameter von `FUN_00185cb0`) und des Zusatzbereichs `0x78400`.
+Languages that need characters outside Windows-1252 (e.g. Polish, Czech, Turkish, Greek, Russian) are not supported yet.
+Plane 0 already contains Greek and Cyrillic glyphs, but the renderer only reaches them through specific 2-byte EUC pairs
+(`A6xx` Greek, `A7xx` would be Cyrillic but is not in the whitelist of `FUN_00181e48`). Supporting them would need either
+executable patches or replacing unused Windows-1252 glyphs in the font with the required letters (and a matching encoding table
+in `sbtext.py`).
+
+## Open questions
+
+- Meaning of `font0` vs. `font1` (parameter of `FUN_00185cb0`) and of the extra range `0x78400`.

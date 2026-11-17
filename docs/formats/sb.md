@@ -1,66 +1,69 @@
-# Skripte (.sb) – Dialoge
+# Scripts (.sb) – dialogue
 
-`\cf\us\*.sb` (647 Kartenskripte) und `\bat\us\*.sb` (69 Kampfskripte), Archiv X3.00. Tool: `tools/sbtext.py`.
+`\cf\us\*.sb` (647 map scripts) and `\bat\us\*.sb` (69 battle scripts), archive X3.00. Tool: `tools/sbtext.py`.
 
-## Aufbau
+## Structure
 
 ```
 0x00  "SB  "   u16 1   u16 1
-0x08  6 × u32  Offsets der Abschnitte 1–6
-0x20  Füllung bis 0x40
+0x08  6 × u32  offsets of sections 1–6
+0x20  padding up to 0x40
 ```
 
-| Abschnitt | Beginnt mit | Inhalt |
+| Section | Starts with | Content |
 |---|---|---|
-| 1 (ab 0x40) | u32 12 | Bytecode |
-| 2 | u32 8, u32 Anzahl | Tabelle (Sprungziele/Daten) |
-| **3** | **u32 8, u32 Anzahl** | **Stringtabelle**: Anzahl × u32 Offset (relativ zum Datenbeginn direkt nach der Tabelle), dann nullterminierte Strings lückenlos, Abschnittsende auf 4 Byte aufgefüllt |
-| 4 | u32 8, u32 Anzahl | Symbole: Paare (Namens-Offset, Code-Offset), Namen wie `runtime_M_setDoorAttr`; Offsets relativ |
-| 5 | u32 8, u32 Anzahl | vermutlich Debug-/Zeileninformationen |
-| 6 | u32 1 | Ressourcen (`BGM`, `us\1010`), meist 20 Byte |
+| 1 (from 0x40) | u32 12 | bytecode |
+| 2 | u32 8, u32 count | table (jump targets/data) |
+| **3** | **u32 8, u32 count** | **string table**: count × u32 offset (relative to the data start right after the table), then null-terminated strings without gaps, section end padded to 4 bytes |
+| 4 | u32 8, u32 count | symbols: pairs (name offset, code offset), names like `runtime_M_setDoorAttr`; relative offsets |
+| 5 | u32 8, u32 count | probably debug/line information |
+| 6 | u32 1 | resources (`BGM`, `us\1010`), usually 20 bytes |
 
-Geprüft an allen 715 Dateien: Header, Stringtabelle und Ausrichtung sind überall gleich. Im Inhalt stehen keine absoluten Offsets auf die Abschnitte 4–6. Der Bytecode verweist auf Strings über deren **Nummer**.
-→ Texte dürfen beliebig länger oder kürzer werden. Beim Neubau werden nur die Header-Offsets der Abschnitte 4–6 verschoben (`build()` in `sbtext.py`). Das koreanische Projekt macht das ebenso.
+Checked on all 715 files: header, string table and alignment are the same everywhere. The content contains no absolute offsets
+into sections 4–6. The bytecode references strings by their **index**.
+→ Texts may become longer or shorter. When rebuilding, only the header offsets of sections 4–6 move (`build()` in `sbtext.py`).
 
-**Roundtrip:** `python -I tools/sbtext.py test extracted/disc1/files/cf/us extracted/disc1/files/bat/us` → 715 identisch, 0 Fehler. Bei verlängerten Strings bleiben die Abschnitte dahinter byte-gleich.
+**Round trip:** `python -I tools/sbtext.py test extracted/disc1/files/cf/us extracted/disc1/files/bat/us` → 715 identical, 0 errors.
+With lengthened strings, the sections after the string table stay byte-identical.
 
-## Inhalt der Stringtabellen (90 580 Strings)
+## Content of the string tables (90 580 strings)
 
-| Kategorie | Anzahl | eindeutig | Übersetzen? |
+| Category | Count | Unique | Translate? |
 |---|---|---|---|
-| `dialog` – beginnt mit `[Sprecher]` oder enthält `<f>/<w>/<l>` | 8 935 | 7 231 (≈ 76 000 Wörter) | ja |
-| `text` – sonstiger englischer Text (Menüs, Auswahl, Systemmeldungen) | 2 196 | 450 | ja |
-| `wort` – Einzelwörter | 1 061 | 243 | **prüfen**: Datenbank-Stichwörter (`Durandal`, `Dämmerung`) oder interne Namen (`getitem`, `kowaremono`) |
-| `bezeichner` – `s082000_02_1mom`, `B01`, `CHRV_EVE0100` | 7 520 | – | nein |
-| `technisch` – `--- main ---`, `*****`, `  px =` | 2 448 | – | nein |
-| `jp` – japanische Debug-Texte (Shift-JIS/EUC-JP) | 68 420 | – | nein, **nicht** als cp1252 umkodieren |
+| `dialog` – starts with `[Speaker]` or contains `<f>/<w>/<l>` | 8 935 | 7 231 (≈ 76 000 words) | yes |
+| `text` – other English text (menus, choices, system messages) | 2 196 | 450 | yes |
+| `wort` – single words | 1 061 | 243 | **check**: database keywords (`Durandal`, `Dämmerung`) or internal names (`getitem`, `kowaremono`) |
+| `bezeichner` – identifiers like `s082000_02_1mom`, `B01`, `CHRV_EVE0100` | 7 520 | – | no |
+| `technisch` – debug labels like `--- main ---`, `*****`, `  px =` | 2 448 | – | no |
+| `jp` – Japanese debug text (Shift-JIS/EUC-JP) | 68 420 | – | no, and **never** re-encode as cp1252 |
 
-Viele Strings wiederholen sich (z. B. „Board the E.S.?<f>“ in allen 647 Kartenskripten). Ein Übersetzungsspeicher nach `text_en` spart viel Arbeit.
+Only `dialog`, `text` and `wort` are exported. Many strings repeat (e.g. "Board the E.S.?<f>" in all 647 map scripts) – the
+translation memory in `build.py` handles that.
 
-## Tags im Text
+## Tags in the text
 
-| Tag | Bedeutung (vorläufig) |
+| Tag | Meaning |
 |---|---|
-| `[Name]` am Anfang | Sprecher, wird als Namensfeld angezeigt |
-| `<f>` | Textbox-Ende / auf Tastendruck warten |
-| `<wNN>` | Pause von NN Frames |
-| `<lN>` | Zeilen-/Layoutsteuerung (z. B. `<l2>`) |
-| `<kText>` | Stichwort-Verknüpfung zur Datenbank (z. B. `<kMöbius Hotel>`). Vermutlich muss der Text identisch zum Datenbank-Stichwort sein → Glossar. |
-| `<col…>`, `$col…;` | Farbe |
-| `\n` | Zeilenumbruch (zwei Zeichen) |
+| `[Name]` at the start | speaker, shown in the name field |
+| `<f>` | end of text box / wait for button |
+| `<wNN>` | pause of NN frames |
+| `<lN>` | line/layout control (e.g. `<l2>` – keep the number of lines) |
+| `<kText>` | keyword link to the database (e.g. `<kMöbius Hotel>`) – use the same term as the database title |
+| `<col…>`, `$col…;` | colour |
+| `\n` | line break (two characters) |
 
-## Export / Import
+Dialogue boxes with a portrait fit about 384 px per line (measured with the game font, `tools/pixelbreite.py`).
+
+## Export / import
 
 ```bash
 python -I tools/sbtext.py export extracted/disc1/files/cf/us extracted/disc1/files/bat/us --out text/en/skripte.csv
-python -I tools/sbtext.py import extracted/disc1/files/cf/us extracted/disc1/files/bat/us --csv text/de/skripte.csv --out build/sb
+python -I tools/sbtext.py import extracted/disc1/files/cf/us extracted/disc1/files/bat/us --csv text/fr/skripte.csv --out build/sb
 ```
 
-Der Import prüft jeden deutschen Text: Er muss in Windows-1252 darstellbar sein und darf keine verbotenen Bytes `A1–A4/A6/AD` enthalten (`docs/formats/font.md`).
+The import checks every translated text: it must be representable in Windows-1252 (plus the game symbols) and must not contain
+the forbidden bytes `A1–A4/A6/AD` (`docs/formats/font.md`).
 
-## Offen
+## Open questions
 
-- Bedeutung der Abschnitte 2 und 5 sowie der Opcode, der Dialogtexte ausgibt. Damit ließe sich „wort“ sicher zuordnen.
-- Maximale Breite einer Textbox in Pixeln (für die Längenprüfung).
-- Ob die Tags `<k…>` mit Datenbank-Stichwörtern verglichen werden.
-- **Test im Spiel** mit verlängertem deutschem Text.
+- Meaning of sections 2 and 5 and the opcode that prints dialogue – this would allow classifying `wort` strings reliably.

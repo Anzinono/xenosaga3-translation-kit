@@ -1,18 +1,18 @@
-"""Texturen in Effekt-Containern (.esd, .esp unter ef/) lesen und schreiben.
+"""Read and write textures in effect containers (.esd, .esp under ef/).
 
-Die Container enthalten Datensätze mit 0x40-Byte-Kopf, jeweils an 0x40er-Grenzen:
-  +0x00 u32 Gesamtgröße (Kopf + Daten)   +0x04 u32 (Adresse/Kennung, unklar)
-  +0x08 u16 Typ (4 = Bild, 3 = Palette)  +0x0A u16 Platz
-  +0x0C u16 Breite  +0x0E u16 Höhe       +0x10 u32 Bits je Pixel (Bild: 4/8; Palette: 4)
-  +0x14 Name (z. B. "moji.bmp", "elevator-a.bmp", "moji.clt"), danach Daten.
-Paletten sind RGBA32 (Alpha 0x80 = deckend); Anzahl Einträge = 2^(Bits-Feld): 4 -> 16, 8 -> 256 Farben.
-Zuordnung Bild -> Palette: nächste noch freie Palette mit gleichem Namensstamm hinter dem Bild.
-4-Bit-Bilder: unteres Nibble = linkes Pixel.
+The containers hold records with a 0x40-byte header, each on a 0x40 boundary:
+  +0x00 u32 total size (header + data)   +0x04 u32 (address/ID, unknown)
+  +0x08 u16 type (4 = image, 3 = palette) +0x0A u16 slot
+  +0x0C u16 width  +0x0E u16 height      +0x10 u32 bits per pixel (image: 4/8; palette: 4)
+  +0x14 name (e.g. "moji.bmp", "elevator-a.bmp", "moji.clt"), followed by data.
+Palettes are RGBA32 (alpha 0x80 = opaque); number of entries = 2^(bits field): 4 -> 16, 8 -> 256 colours.
+Image -> palette: the next still unused palette with the same name stem after the image.
+4-bit images: low nibble = left pixel.
 
-Befehle:
-  list    python -I tools/eftex.py list <datei> [...]
-  export  python -I tools/eftex.py export <datei> --out <ordner>
-  test    python -I tools/eftex.py test <datei> [...]   (Index lesen -> schreiben muss byte-identisch sein)
+Commands:
+  list    python -I tools/eftex.py list <file> [...]
+  export  python -I tools/eftex.py export <file> --out <folder>
+  test    python -I tools/eftex.py test <file> [...]   (index read -> write must be byte-identical)
 """
 from __future__ import annotations
 
@@ -85,7 +85,7 @@ def palette(data: bytes, r: Rec) -> list[tuple[int, int, int, int]]:
         return [(v * 255 // max(n - 1, 1),) * 3 + (255,) for v in range(n)]
     raw = data[r.pal.data_off:r.pal.data_off + (1 << r.pal.bpp) * 4]
     pal = [(raw[i], raw[i + 1], raw[i + 2], min(raw[i + 3] * 2, 255)) for i in range(0, len(raw), 4)]
-    if len(pal) == 256:                           # CSM1-Speicherreihenfolge -> logisch
+    if len(pal) == 256:                           # CSM1 memory order -> logical order
         for g in range(8):
             for j in range(8):
                 k, m = g * 32 + 8 + j, g * 32 + 16 + j
@@ -102,7 +102,7 @@ def indices(data: bytes, r: Rec) -> list[int]:
 
 def set_indices(data: bytes, r: Rec, idx: list[int]) -> bytes:
     if len(idx) != r.w * r.h:
-        raise ValueError("falsche Pixelzahl")
+        raise ValueError("wrong pixel count")
     if r.bpp == 8:
         raw = bytes(idx)
     else:
@@ -147,7 +147,7 @@ def cmd_test(args) -> int:
             if r.bpp in (4, 8):
                 out = set_indices(out, r, indices(data, r))
         ok = out == data
-        print(f"{Path(f).name}: {len(textures(data))} Bilder, Roundtrip {'identisch' if ok else 'ABWEICHEND'}", file=sys.stderr)
+        print(f"{Path(f).name}: {len(textures(data))} images, round trip {'identical' if ok else 'DIFFERENT'}", file=sys.stderr)
         bad += not ok
     return 1 if bad else 0
 

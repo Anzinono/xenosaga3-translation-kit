@@ -1,14 +1,14 @@
-"""Datenbankbilder (jpg/us/dtimg_*.jpg) mit englischem Text auf Deutsch umstellen.
+"""Translate database images (jpg/us/dtimg_*.jpg) that contain English text.
 
-Je Textzeile aus text/de/grafik_datenbank.json:
-  1. Schriftpixel im angegebenen Bereich per Kontrast zum örtlichen Hintergrund (Median 9x9) erkennen.
-  2. Diese Pixel (1 px erweitert) aus den Nachbarn auffüllen (wie tools/figurenkarten.py).
-  3. Englischen Text mit der Ersatzschrift auf Höhe/Breite des Originals einpassen, deutschen Text mit denselben
-     Werten setzen (links/rechts/mittig wie das Original), Farbe aus dem Original; 'sperren' = Buchstaben mit
-     Abstand statt Stauchung (für gesperrt gesetzte Titel wie "R E A L I A N").
-  4. JPG mit den Tabellen des Originals speichern (quality="keep"). Identische Kopien dtimg_1xxx bekommen dasselbe Bild.
+For each text line in text/<lang>/grafik_datenbank.json:
+  1. Detect text pixels in the given box by contrast to the local background (median 9x9).
+  2. Fill these pixels (grown by 1 px) from their neighbours (like tools/figurenkarten.py).
+  3. Fit the English text with the substitute font to the height/width of the original, set the translation with the same
+     values (left/right/centred like the original), colour taken from the original; 'sperren' = letter spacing
+     instead of condensing (for letter-spaced titles like "R E A L I A N").
+  4. Save the JPG with the original's tables (quality="keep"). Identical copies dtimg_1xxx get the same image.
 
-Aufruf:  python -I tools/dbbilder.py --out build/de/x3 [--vorschau build/grafik/datenbank]
+Usage:  python -I tools/dbbilder.py --out build/<lang>/x3 [--vorschau build/grafik/datenbank]
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sprache import LANG, TEXT_DIR  # noqa: E402
 try:
     from PIL import Image, ImageDraw, ImageFilter, ImageFont
-except ImportError:                                   # python -I blendet die Benutzer-Pakete aus
+except ImportError:                                   # python -I hides user site packages
     sys.path.append(site.getusersitepackages())
     from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from figurenkarten import erase  # noqa: E402
@@ -37,7 +37,7 @@ CONTRAST = 32
 
 
 def text_mask(gray: Image.Image, box: list[int], bright: bool, contrast: int = CONTRAST) -> Image.Image:
-    """Maske (Größe der Box) der Pixel, die sich deutlich vom örtlichen Hintergrund abheben."""
+    """Mask (size of the box) of the pixels that clearly stand out from the local background."""
     x0, y0, x1, y1 = box
     pad = 6
     big = gray.crop((x0 - pad, y0 - pad, x1 + pad, y1 + pad))
@@ -52,7 +52,7 @@ def text_mask(gray: Image.Image, box: list[int], bright: bool, contrast: int = C
 
 
 def render(text: str, fontfile: str, size: float, sx: float, gap: float | None = None) -> tuple[Image.Image, int]:
-    """Graustufen-Deckkraft in Zielauflösung + Grundlinie. gap: fester Buchstabenabstand in Zielpixeln (sperren)."""
+    """Grayscale opacity at target resolution + baseline. gap: fixed letter spacing in target pixels (sperren)."""
     f = ImageFont.truetype(str(FONTS / fontfile), max(1, round(size * SS)))
     asc, desc = f.getmetrics()
     if gap is None:
@@ -78,8 +78,8 @@ def ink(img: Image.Image) -> tuple[int, int, int, int]:
 
 def fit(en: str, fontfile: str, wf: float, target: tuple[int, int, int, int], sperren: bool,
         size: float | None = None, sx: float | None = None):
-    """Größe/Stauchung (oder Buchstabenabstand), mit denen der englische Text den Zielbereich trifft.
-    size/sx aus der Konfiguration ('groesse', 'stauchung') werden übernommen statt gemessen."""
+    """Size/condensing (or letter spacing) with which the English text matches the target box.
+    size/sx from the configuration ('groesse', 'stauchung') are used instead of measured."""
     th, tw = target[3] - target[1], target[2] - target[0]
     probe = en.replace(" ", "") if sperren else en
     if size is not None:
@@ -102,15 +102,15 @@ def fit(en: str, fontfile: str, wf: float, target: tuple[int, int, int, int], sp
         img, _ = render(probe, fontfile, lo, wf, gap=0)
         bb = ink(img)
         n = len(probe)
-        gap = (tw - (bb[2] - bb[0])) / max(1, n - 1)        # Abstand im Original
+        gap = (tw - (bb[2] - bb[0])) / max(1, n - 1)        # spacing in the original
         return lo, wf, gap
     bb = ink(render(en, fontfile, lo, wf)[0])
     return lo, wf * tw / (bb[2] - bb[0]), None
 
 
 def erase_columns(im: Image.Image, box: list[int]) -> None:
-    """Rechteck löschen: je Spalte senkrecht zwischen der Zeile darüber und darunter überblenden
-    (für Text auf unruhigem, aber senkrecht gegliedertem Hintergrund)."""
+    """Erase a rectangle: per column, blend vertically between the row above and below
+    (for text on a busy but vertically structured background)."""
     x0, y0, x1, y1 = box
     px = im.load()
     for x in range(x0, x1):
@@ -121,14 +121,14 @@ def erase_columns(im: Image.Image, box: list[int]) -> None:
 
 
 def measure(im: Image.Image, z: dict) -> dict:
-    """Schriftmaske, Zielbereich und Farbe der Originalzeile (am unveränderten Bild)."""
+    """Text mask, target box and colour of the original line (on the unchanged image)."""
     gray = im.convert("L")
     box = z["box"]
     m = text_mask(gray, box, z["hell"], z.get("kontrast", CONTRAST))
     rows = [sum(1 for x in range(m.width) if m.getpixel((x, y))) for y in range(m.height)]
     if not max(rows):
-        raise SystemExit(f"{z['en']!r}: keine Schrift im Bereich {box}")
-    # zusammenhängender Zeilenblock um die dichteste Zeile (Rauschen/Nachbarzeilen bleiben draußen)
+        raise SystemExit(f"{z['en']!r}: no text in box {box}")
+    # contiguous block of rows around the densest row (noise/neighbouring lines stay out)
     pk = rows.index(max(rows))
     y0 = pk
     while y0 > 0 and rows[y0 - 1] >= 2:
@@ -156,7 +156,7 @@ def draw_line(im: Image.Image, z: dict, meas: dict) -> str:
     img, base = render(text, font, size, sx, gap)
     bb = ink(img)
     maxw = box[2] - box[0]
-    if sperren and bb[2] - bb[0] > maxw:                     # Abstand verkleinern, bis es passt
+    if sperren and bb[2] - bb[0] > maxw:                     # reduce the spacing until it fits
         gap = max(0.0, gap - (bb[2] - bb[0] - maxw) / max(1, len(text) - 1))
         img, base = render(text, font, size, sx, gap)
         bb = ink(img)
@@ -164,7 +164,7 @@ def draw_line(im: Image.Image, z: dict, meas: dict) -> str:
         sx *= maxw / (bb[2] - bb[0])
         img, base = render(text, font, size, sx, gap)
         bb = ink(img)
-    # Grundlinie wie beim englischen Text
+    # baseline as for the English text
     probe = z["en"].replace(" ", "") if sperren else z["en"]
     en_img, en_base = render(probe, font, size, wf if sperren else sx, gap)
     base_y = target[1] - (ink(en_img)[1] - en_base)
@@ -177,7 +177,7 @@ def draw_line(im: Image.Image, z: dict, meas: dict) -> str:
         sh = img.filter(ImageFilter.GaussianBlur(0.8)).point(lambda v: round(v * 0.45))
         im.paste(Image.new("RGB", img.size, (0, 0, 0)), (ox + dx, oy + dy), sh)
     im.paste(Image.new("RGB", img.size, color), (ox, oy), img)
-    return f"{z['de']!r} Größe {size:.1f}" + (f", Abstand {gap:.1f}" if gap is not None else "")
+    return f"{z[LANG]!r} size {size:.1f}" + (f", spacing {gap:.1f}" if gap is not None else "")
 
 
 def main() -> int:
@@ -192,19 +192,19 @@ def main() -> int:
     pv = []
     for b in cfg["bilder"]:
         if not all(str(z.get(LANG, "")).strip() for z in b["zeilen"]):
-            continue                                               # unübersetzt: Original bleibt
+            continue                                               # untranslated: original stays
         f = src / b["datei"]
         data = f.read_bytes()
         im = Image.open(io.BytesIO(data))
         im.load()
         orig = im.copy()
-        meas = [measure(orig, z) for z in b["zeilen"]]           # erst alles messen …
-        if "loeschbox" in b:                                        # … dann löschen: ganzer Block spaltenweise …
+        meas = [measure(orig, z) for z in b["zeilen"]]           # measure everything first …
+        if "loeschbox" in b:                                        # … then erase: whole block column by column …
             erase_columns(im, b["loeschbox"])
-        else:                                                       # … oder nur die Schriftpixel …
+        else:                                                       # … or only the text pixels …
             for z, mz in zip(b["zeilen"], meas):
                 erase(im, (z["box"][0], z["box"][1]), mz["mask"].filter(ImageFilter.MaxFilter(z.get("loeschrand", 5 if z.get("schatten") else 3))))
-        notes = [draw_line(im, z, mz) for z, mz in zip(b["zeilen"], meas)]   # … dann neu setzen
+        notes = [draw_line(im, z, mz) for z, mz in zip(b["zeilen"], meas)]   # … then draw anew
         buf = io.BytesIO()
         im.save(buf, "JPEG", quality="keep")
         targets = [b["datei"]]

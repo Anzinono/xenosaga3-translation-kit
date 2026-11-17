@@ -1,20 +1,20 @@
-"""Einstieg für eine neue Übersetzung: Texte aus der eigenen Disc exportieren und Vorlagen anlegen.
+"""Starting point for a new translation: export the text from your own disc and create templates.
 
-  1. prüft die Original-Images in ISO/ (Prüfsumme) und entpackt die benötigten Textdateien
-  2. exportiert alle englischen Texte nach text/en/*.csv
-  3. legt text/<sprache>/ an: Kopien der Tabellen mit leerer Spalte text_<sprache>,
-     Grafik-Konfigurationen aus vorlagen/ (bestehende Dateien werden NIE überschrieben)
+  1. checks the original images in ISO/ (checksum) and extracts the required text files
+  2. exports all English text to text/en/*.csv
+  3. creates text/<lang>/: copies of the tables with an empty column text_<lang>,
+     graphics configurations from vorlagen/ (existing files are NEVER overwritten)
 
-Aufruf (im Projekt-Root):
+Usage (in the project root):
   python -I tools/vorbereiten.py --sprache fr
-  python -I tools/vorbereiten.py --sprache fr --disc 1      # nur Disc 1 (Untertitel von Disc 2 fehlen dann)
+  python -I tools/vorbereiten.py --sprache fr --disc 1      # disc 1 only (disc 2 subtitles are then missing)
 """
 from __future__ import annotations
 
 import os
 import sys
 
-for _i, _a in enumerate(sys.argv):           # Sprache vor dem Import der übrigen Module setzen
+for _i, _a in enumerate(sys.argv):           # set the language before importing the other modules
     if _a == "--sprache" and _i + 1 < len(sys.argv):
         os.environ["XS3_LANG"] = sys.argv[_i + 1]
 
@@ -57,35 +57,35 @@ def make_templates() -> None:
     for src in sorted(EN.glob("*.csv")):
         dst = TEXT_DIR / src.name
         if dst.exists():
-            print(f"  {dst.relative_to(ROOT)} existiert – nicht überschrieben")
+            print(f"  {dst.relative_to(ROOT)} exists – not overwritten")
             continue
         shutil.copyfile(src, dst)
-        print(f"  {dst.relative_to(ROOT)} angelegt (Spalte {COL} ausfüllen)")
+        print(f"  {dst.relative_to(ROOT)} created (fill column {COL})")
     for src in sorted(VORLAGEN.glob("grafik_*.json")):
         dst = TEXT_DIR / src.name
         if dst.exists():
-            print(f"  {dst.relative_to(ROOT)} existiert – nicht überschrieben")
+            print(f"  {dst.relative_to(ROOT)} exists – not overwritten")
             continue
         text = src.read_text(encoding="utf-8").replace('"xx":', f'"{LANG}":')
-        json.loads(text)                                         # Gültigkeit prüfen
+        json.loads(text)                                         # validate
         dst.write_text(text, encoding="utf-8")
-        print(f"  {dst.relative_to(ROOT)} angelegt (Felder \"{LANG}\" ausfüllen)")
+        print(f"  {dst.relative_to(ROOT)} created (fill fields \"{LANG}\")")
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--sprache", required=True, help="Sprachcode der Übersetzung, z. B. fr, es, it, pt-br")
+    ap.add_argument("--sprache", required=True, help="language code of the translation, e.g. fr, es, it, pt-br")
     ap.add_argument("--disc", type=int, action="append", choices=(1, 2))
-    ap.add_argument("--ohne-pruefsumme", action="store_true")
+    ap.add_argument("--ohne-pruefsumme", action="store_true", help="skip the SHA1 check of the original images")
     args = ap.parse_args()
     discs = sorted(set(args.disc or [1, 2]))
-    print("1. Original-Images prüfen und Textdateien entpacken")
+    print("1. Checking original images and extracting text files")
     build.prepare(discs, not args.ohne_pruefsumme)
-    print("2. Englische Texte exportieren -> text/en/")
+    print("2. Exporting English text -> text/en/")
     export_all(discs)
-    print(f"3. Vorlagen für '{LANG}' anlegen -> text/{LANG}/")
+    print(f"3. Creating templates for '{LANG}' -> text/{LANG}/")
     make_templates()
-    print(f"\nFertig. Nächste Schritte: Spalte {COL} in text/{LANG}/*.csv ausfüllen, dann\n"
+    print(f"\nDone. Next steps: fill column {COL} in text/{LANG}/*.csv, then\n"
           f"  python -I tools/build.py --sprache {LANG}")
     return 0
 

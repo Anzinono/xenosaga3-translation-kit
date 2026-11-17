@@ -1,11 +1,11 @@
-"""Prüft die X3-Kataloge gegen ihre Datenketten und zählt Inhalte nach Ordner/Endung.
+"""Checks the X3 catalogs against their data chains and counts contents by folder/extension.
 
-Aufruf:
-  python tools/x3stats.py <Ordner mit X3.*-Dateien> [<Ordner Disc 2> ...]
+Usage:
+  python tools/x3stats.py <folder with X3.* files> [<folder disc 2> ...]
 
-Erwartet je Ordner die Katalogdatei(en) X3.00 / X3.10 / X3.20 und die
-zugehörigen Datenteile (X3.01, X3.02, ...). Fehlen die Datenteile, werden nur die
-Kataloge ausgewertet; die Kettengröße kann dann mit --size KATALOG=BYTES angegeben werden.
+Expects per folder the catalog file(s) X3.00 / X3.10 / X3.20 and the
+matching data parts (X3.01, X3.02, ...). Without the data parts only the
+catalogs are evaluated; the chain size can then be given with --size CATALOG=BYTES.
 """
 from __future__ import annotations
 
@@ -20,14 +20,14 @@ from x3toc import parse_toc  # noqa: E402
 
 
 def chain_size(folder: str, toc_name: str) -> int | None:
-    stem = toc_name[:-1]  # "X3.0" aus "X3.00"
+    stem = toc_name[:-1]  # "X3.0" from "X3.00"
     parts = sorted(p for p in glob.glob(os.path.join(folder, stem + "*")) if not p.endswith(toc_name))
     return sum(os.path.getsize(p) for p in parts) if parts else None
 
 
 def ext_of(path: str) -> str:
     base = path.rsplit("\\", 1)[-1]
-    return base.rsplit(".", 1)[-1].lower() if "." in base else "(ohne)"
+    return base.rsplit(".", 1)[-1].lower() if "." in base else "(none)"
 
 
 def group_of(path: str) -> str:
@@ -42,13 +42,13 @@ def report(toc_path: str, size: int | None) -> None:
     srt = sorted(entries, key=lambda e: e.offset)
     overlaps = sum(1 for a, b in zip(srt, srt[1:]) if a.offset + a.size > b.offset)
     dupes = len(entries) - len({e.path.lower() for e in entries})
-    print(f"== {toc_path}: {len(entries)} Dateien, {used / 2**20:.0f} MiB belegt")
+    print(f"== {toc_path}: {len(entries)} files, {used / 2**20:.0f} MiB used")
     if size is not None:
         outside = sum(1 for e in entries if e.offset + e.size > size)
-        print(f"   Kette {size / 2**20:.0f} MiB, außerhalb: {outside}, Überlappungen: {overlaps}, doppelte Pfade: {dupes}")
+        print(f"   chain {size / 2**20:.0f} MiB, outside: {outside}, overlaps: {overlaps}, duplicate paths: {dupes}")
     else:
-        print(f"   (Kettengröße unbekannt) Überlappungen: {overlaps}, doppelte Pfade: {dupes}")
-    for title, key in (("Endungen", ext_of), ("Ordner", group_of)):
+        print(f"   (chain size unknown) overlaps: {overlaps}, duplicate paths: {dupes}")
+    for title, key in (("Extensions", ext_of), ("Folders", group_of)):
         agg: dict[str, list[int]] = defaultdict(lambda: [0, 0])
         for e in entries:
             a = agg[key(e.path)]
@@ -57,13 +57,13 @@ def report(toc_path: str, size: int | None) -> None:
         rows = sorted(agg.items(), key=lambda kv: -kv[1][1])
         print(f"   {title}:")
         for name, (n, s) in rows:
-            print(f"     {name:<22} {n:>6} Dateien {s / 2**20:>9.1f} MiB")
+            print(f"     {name:<22} {n:>6} files {s / 2**20:>9.1f} MiB")
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("folders", nargs="+")
-    ap.add_argument("--size", action="append", default=[], help="KATALOGDATEI=BYTES")
+    ap.add_argument("--size", action="append", default=[], help="CATALOG=BYTES (chain size if the data parts are missing)")
     args = ap.parse_args()
     sizes = dict(s.split("=", 1) for s in args.size)
     for folder in args.folders:

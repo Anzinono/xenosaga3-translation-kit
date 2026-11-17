@@ -1,18 +1,18 @@
-"""Texte aus dem Minispiel (mg1/us/Message.Dat) und den Episoden-Rückblicken (mnu/pse/us/*.mes).
+"""Text of the minigame (mg1/us/Message.Dat) and the episode recaps (mnu/pse/us/*.mes).
 
-Message.Dat (siehe docs/formats/menue.md):
-  0x0000  933 x u32 Offset (relativ zu 0x2800)
-  danach  bis 0x2800 andere Daten (bleiben unverändert)
-  0x2800  nullterminierte Strings bis Dateiende
-.mes (nur EP1.mes und EP2.mes sind englisch; AC/PP/opening/test enthalten nur Japanisch):
-  Textdatei (CRLF), Abschnitte "#MESSAGE n", danach Textzeilen, Leerzeilen als Abstand.
-  Exportiert wird pro Abschnitt der Text ohne die abschließenden Leerzeilen (Zeilen mit
-  echtem Zeilenumbruch in der CSV-Zelle). Beim Import bleiben Leerzeilen und Kopf erhalten.
+Message.Dat (see docs/formats/menue.md):
+  0x0000  933 x u32 offset (relative to 0x2800)
+  then    up to 0x2800 other data (unchanged)
+  0x2800  null-terminated strings up to the end of the file
+.mes (only EP1.mes and EP2.mes are English; AC/PP/opening/test contain only Japanese):
+  text file (CRLF), sections "#MESSAGE n", then text lines, blank lines as spacing.
+  Each section is exported without its trailing blank lines (lines with real
+  line breaks in the CSV cell). On import, blank lines and headers are preserved.
 
-Befehle:
+Commands:
   export  python tools/mestext.py export <Message.Dat|*.mes> [...] --out text/en/minispiel_mes.csv
-  import  python tools/mestext.py import <Dateien> [...] --csv übersetzt.csv --out <zielordner>
-  test    python tools/mestext.py test <Dateien> [...]
+  import  python tools/mestext.py import <files> [...] --csv translated.csv --out <target folder>
+  test    python tools/mestext.py test <files> [...]
 """
 from __future__ import annotations
 
@@ -36,12 +36,12 @@ MSG_COUNT = 933
 def msg_parse(data: bytes) -> tuple[list[int], dict[int, bytes]]:
     table = list(struct.unpack_from(f"<{MSG_COUNT}I", data, 0))
     if struct.unpack_from("<I", data, 4 * MSG_COUNT)[0] != 0:
-        raise SBError("Message.Dat: Tabelle hat nicht 933 Einträge")
+        raise SBError("Message.Dat: table does not have 933 entries")
     strings = {o: data[MSG_BASE + o:data.index(b"\0", MSG_BASE + o)] for o in sorted(set(table))}
     starts = {0} | {i + 1 - MSG_BASE for i in range(MSG_BASE, len(data) - 1) if data[i] == 0}
     unref = [s for s in starts if s not in strings and data[MSG_BASE + s] != 0]
     if unref:
-        raise SBError(f"Message.Dat: {len(unref)} Strings ohne Verweis")
+        raise SBError(f"Message.Dat: {len(unref)} strings without reference")
     return table, strings
 
 
@@ -60,7 +60,7 @@ MSG_RE = re.compile(rb"^#MESSAGE (\d+)\r?$")
 
 
 def mes_parse(data: bytes) -> list[tuple[bytes, list[bytes], list[bytes]]]:
-    """-> Abschnitte (Kopfzeile, Textzeilen, Leerzeilen danach roh); Abschnitt 0 = Vorspann."""
+    """-> sections (header line, text lines, raw blank lines after it); section 0 = preamble."""
     lines = data.split(b"\n")
     sections: list[tuple[bytes, list[bytes]]] = [(b"", [])]
     for line in lines:
@@ -94,13 +94,13 @@ def is_english(data: bytes) -> bool:
     return not re.search(rb"[\xa1-\xfe][\xa1-\xfe]", data)
 
 
-# ---------------------------------------------------------------- Befehle
+# ---------------------------------------------------------------- commands
 def entries(path: Path) -> list[tuple[str, str]]:
     """-> [(schluessel, text_en)]"""
     data = path.read_bytes()
     if path.name.lower() == "message.dat":
         _, strings = msg_parse(data)
-        # japanische Reste (Hiragana/Kanji) werden im US-Spiel nicht angezeigt -> nicht exportieren
+        # Japanese leftovers (hiragana/kanji) are not shown in the US game -> do not export
         return [(str(o), decode_game(s)) for o, s in strings.items() if s and not JAPANESE_RE.search(s)]
     if not is_english(data):
         return []
@@ -121,10 +121,10 @@ def cmd_export(args) -> int:
             p = Path(f)
             rows = entries(p)
             if not rows and p.suffix.lower() == ".mes":
-                print(f"{p.name}: nur Japanisch, übersprungen", file=sys.stderr)
+                print(f"{p.name}: Japanese only, skipped", file=sys.stderr)
             for key, text in rows:
                 w.writerow([p.name, key, text, ""]); n += 1
-    print(f"{n} Texte nach {out} exportiert.", file=sys.stderr)
+    print(f"{n} texts exported to {out}.", file=sys.stderr)
     return 0
 
 
@@ -168,7 +168,7 @@ def cmd_import(args) -> int:
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(new)
     for e in errors:
-        print("FEHLER:", e, file=sys.stderr)
+        print("ERROR:", e, file=sys.stderr)
     return 1 if errors else 0
 
 
@@ -181,12 +181,12 @@ def cmd_test(args) -> int:
         same = translate(p, {}, []) == data
         longer = {k: t + " (Test)" for k, t in rows}
         with tempfile.TemporaryDirectory() as td:
-            tmp = Path(td) / p.name                       # gleicher Name: Format wird am Namen erkannt
+            tmp = Path(td) / p.name                       # same name: the format is recognised by name
             tmp.write_bytes(translate(p, longer, []))
             again = dict(entries(tmp))
-        # Message.Dat: Schlüssel sind Offsets und ändern sich -> Texte vergleichen
+        # Message.Dat: keys are offsets and change -> compare texts
         ok = sorted(again.values()) == sorted(longer.values()) if p.name.lower() == "message.dat" else again == longer
-        print(f"{p.name}: {len(rows)} Texte, Roundtrip {'identisch' if same else 'ABWEICHEND'}, Verlängerung {'ok' if ok else 'FEHLER'}", file=sys.stderr)
+        print(f"{p.name}: {len(rows)} texts, round trip {'identical' if same else 'DIFFERENT'}, lengthening {'ok' if ok else 'ERROR'}", file=sys.stderr)
         bad += (not same) + (not ok)
     return 1 if bad else 0
 

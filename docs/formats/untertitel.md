@@ -1,42 +1,44 @@
-# Untertitel (`\evt\us\*.txt`, `\mov\us\**\*.txt`)
+# Subtitles (`\evt\us\*.txt`, `\mov\us\**\*.txt`)
 
-Gilt für 275 Dateien auf beiden Discs (Disc 1: 36 evt + 111 mov, Disc 2: 18 evt + 110 mov; `mov\us` hat einen Unterordner `bat`).
-Reiner Text, **Windows-1252** (einziges Sonderzeichen im Original: `ä` in „Dämmerung“, `disc2 \mov\us\s100120.txt`), Zeilenenden gemischt CRLF/LF.
+275 files on both discs (disc 1: 36 evt + 111 mov, disc 2: 18 evt + 110 mov; `mov\us` has a subfolder `bat`).
+Plain text, **Windows-1252**, mixed CRLF/LF line endings.
 
-## Aufbau
+## Structure
 
 ```
-00:00:00<TAB>$ay375;$xx0,24;$rubyy-4;$col707070;     ← Einstellungen (1. Zeile, 273 Dateien)
-00:22:18<TAB>This thing is pretty big!                ← Start + Text
-+00:01:20                                             ← Ende als Dauer (relativ)
+00:00:00<TAB>$ay375;$xx0,24;$rubyy-4;$col707070;     ← settings (first line, 273 files)
+00:22:18<TAB>This thing is pretty big!                ← start + text
++00:01:20                                             ← end as duration (relative)
 00:30:20<TAB>Unable to determine mass due to\nabnormal gravitational fields.
 +00:03:25
 1054<TAB>Still, these values seem to be rather unusual.
-1140                                                  ← Ende als absoluter Wert
-end                                                   ← Dateiende
+1140                                                  ← end as absolute value
+end                                                   ← end of file
 ```
 
-| Zeilenart | Anzahl | Bedeutung |
+| Line type | Count | Meaning |
 |---|---|---|
-| `Zeit<TAB>Text` / `+Zeit<TAB>Text` | 3 053 | Untertitel beginnt (`+` = relativ zum vorherigen Zeitpunkt) |
-| `Zeit` allein | ca. 1 900 | Ende des vorherigen Untertitels (absolut) |
-| `+Zeit` allein | ca. 400 | Ende als Dauer ab Start |
+| `time<TAB>text` / `+time<TAB>text` | 3 053 | subtitle starts (`+` = relative to the previous time) |
+| `time` alone | ≈ 1 900 | end of the previous subtitle (absolute) |
+| `+time` alone | ≈ 400 | end as duration from the start |
+| `time<TAB>$command…;` | 273 | display: `$ay` y position, `$xx` x position/spacing, `$rubyy` ruby offset, `$col` colour (RRGGBB) |
+| `end` | 274 | end of file |
+| `mono` | 1 | special case in `mov\us\s020000.txt` |
 
-751 Untertitel haben keine eigene Endzeile: Auf sie folgt direkt der nächste Start (z. B. „Right!“ → `+00:00:15<TAB>Roger!`). Sie bleiben vermutlich bis dahin sichtbar.
-| `Zeit<TAB>$befehl…;` | 273 | Darstellung: `$ay` Y-Position, `$xx` X-Position/Abstand, `$rubyy` Ruby-Versatz, `$col` Farbe (RRGGBB) |
-| `end` | 274 | Dateiende |
-| `mono` | 1 | Sonderfall in `mov\us\s020000.txt` |
+751 subtitles have no end line of their own – the next start follows directly (e.g. "Right!" → `+00:00:15<TAB>Roger!`).
 
-Zeitformate: `MM:SS:FF` (meist), `+MM:SS:FF`, `MMM:SS:FF` (1×), `+00:0:25` (1×, Tippfehler im Original) und reine Zahlen (Frames?). Die Einheit von `FF` und der Zahlen ist noch offen.
+Time formats: `MM:SS:FF` (most), `+MM:SS:FF`, `MMM:SS:FF` (once), `+00:0:25` (once, typo in the original) and plain numbers (frames?).
+`s020000.txt` contains position lines `x,y,…,text` – translate the text part only and do not add line breaks.
 
-Im Text: `\n` = Zeilenumbruch (**zwei Zeichen**, Backslash + n). Andere Tags kommen nicht vor. Längste Einzelzeile im Original: ca. 45 Zeichen.
+In the text: `\n` = line break (**two characters**, backslash + n). No other tags. At most 2 lines per subtitle in the original.
 
-## Export
+## Export / import
 
-`python -I pySkript/subtitle_export.py` → `text/en/untertitel.csv` (3 053 Untertitel aus 275 Dateien; `s060600.txt` enthält keine).
-Spalten: `datei; nr; zeile; start; ende; text_en; zeilen; max_zeichen; text_de`. Im Original höchstens 2 Zeilen pro Untertitel und höchstens 69 Zeichen pro Zeile.
+```bash
+python -I pySkript/subtitle_export.py --out text/en/untertitel.csv     # language column via XS3_LANG
+python -I tools/subtitle_import.py --csv text/fr/untertitel.csv --out build/fr/untertitel
+```
 
-## Für die Reinsertion
-
-- Pro Untertitel eine CSV-Zeile: Datei, laufende Nr., Startzeile, Start, Ende, Text. Nur der Text wird übersetzt; Zeiten und Befehlszeilen bleiben unverändert.
-- Beim Zurückschreiben die Datei Zeile für Zeile neu aufbauen und nur den Textteil nach dem TAB ersetzen. Zeilenenden pro Zeile beibehalten (CRLF/LF), dann bleibt der Diff minimal.
+Columns: `datei; nr; zeile; start; ende; text_en; zeilen; max_zeichen; text_<code>` (file, number, line, start, end, English text,
+lines, max. characters, translation). Only the text is translated; times and command lines stay unchanged. The import rebuilds each
+file line by line and only replaces the text after the TAB, keeping each line's ending (CRLF/LF).

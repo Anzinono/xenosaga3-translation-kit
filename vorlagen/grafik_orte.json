@@ -1,8 +1,8 @@
 {
-  "_hinweis": "Ortseinblendungen (Effekt-Dateien ef/esd/us/*.esd, ef/map/us/*.esp). 'maske' = Name der Deckkraftmaske, 'en' = Originaltext (dient zum Ausmessen der Schriftgröße), 'de' = neuer Text. Leeres 'de' oder Eintrag fehlt = bleibt englisch. Erzeugt von tools/ortstitel.py, siehe docs/grafik.md.",
+  "_hinweis": "Location titles (effect files ef/esd/us/*.esd, ef/map/us/*.esp). 'maske' = name of the opacity mask, 'en' = original text (used to measure the font size), your language field = new text. Empty field or missing entry = stays English. A '●' stands for the button symbol. 'stile' (styles): schrift = font, schatten = shadow offsets. Used by tools/ortstitel.py, see docs/grafik.md.",
   "stile": {
     "A": {
-      "_hinweis": "Gebietstitel 256x32, verzierte Schrift mit Schatten",
+      "_hinweis": "area titles 256x32, ornate font with shadow",
       "schrift": "courbd.ttf",
       "schatten": [
         [
@@ -17,7 +17,7 @@
       "schatten_deckkraft": 64
     },
     "B": {
-      "_hinweis": "Kartenbeschriftungen 256x64 und Hinweiszeile, schlicht",
+      "_hinweis": "map labels 256x64 and hint line, plain font",
       "schrift": "msgothic.ttc",
       "schatten": [],
       "schatten_deckkraft": 0
@@ -212,5 +212,5 @@
       "xx": ""
     }
   ],
-  "_unveraendert": "Elsa, Rennes-le-Château, Labyrinthos, Durandal, Michtam, Miltia (Eigennamen, G0); ゾハル・ダンジョン und ミルチア (japanische Reste, im US-Spiel nicht genutzt)"
+  "_unveraendert": "Elsa, Rennes-le-Château, Labyrinthos, Durandal, Michtam, Miltia (proper names, usually kept); ゾハル・ダンジョン and ミルチア (Japanese leftovers, not used in the US game)"
 }

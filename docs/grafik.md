@@ -1,117 +1,122 @@
-# Spielgrafiken mit Text (Phase 5, Punkt 4)
+# Game graphics with text
 
-**Status (2026-11-16): abgeschlossen.** Titelbildschirm, Ortseinblendungen, Figurenkarten und Datenbankbilder sind übersetzt und in PCSX2 bestätigt; Kampfanzeige, Game Over und A.G.W.S. bleiben auf Wunsch englisch.
+Covers all image formats on disc 1 (disc 2 contains the same graphics). Translated and tested in PCSX2 (German):
+title screen, location titles, character cards, database images. Battle HUD, GAME OVER and A.G.W.S. were left in English.
 
-Stand 2026-11-16. Gesichtet wurden alle Bildformate von Disc 1 (Disc 2 enthält dieselben Grafiken).
+## Tools
 
-## Werkzeuge
-
-| Tool | Zweck |
+| Tool | Purpose |
 |---|---|
-| `tools/grafik_inventar.py` | exportiert alle Kandidaten nach `build/grafik/inventar/` (PNG/JPG), schreibt `index.html` (Übersicht), `kontakt.html` (Kontaktbogen) und `inventar.csv` |
-| `tools/eftex.py` | Texturen in Effekt-Containern `.esd`/`.esp` lesen/schreiben (`list`, `export`, `test`) |
-| `tools/tm2.py` | TIM2-Texturen `.tm2` lesen/schreiben (`export`, `import` für RGBA32, `test`) |
-| `tools/pngrgba.py` | PNG lesen ohne Zusatzpakete (Graustufen, RGB, RGBA, Palette) |
-| `tools/xtx.py` | XTX 0x08 (siehe `docs/formats/xtx.md`) |
+| `tools/grafik_inventar.py` | exports all candidates to `build/grafik/inventar/` (PNG/JPG) with `index.html` (overview), `kontakt.html` (contact sheet) and `inventar.csv` |
+| `tools/grafik_vergleich.py` | before/after page of all translated graphics → `build/grafik/inventar/vergleich.html` |
+| `tools/eftex.py` | textures in effect containers `.esd`/`.esp` (`list`, `export`, `test`) |
+| `tools/tm2.py` | TIM2 textures `.tm2` (`export`, `import` for RGBA32, `test`) |
+| `tools/pngrgba.py` | PNG reader without extra packages (gray, RGB, RGBA, palette) |
+| `tools/xtx.py` | XTX format 0x08 (see `docs/formats/xtx.md`) |
+| `tools/titelbild.py`, `ortstitel.py`, `figurenkarten.py`, `dbbilder.py` | generators for the translated graphics (configured in `text/<code>/grafik_*.json`) |
 
-Vorher entpacken (einmalig):
-
-```bash
-python -I tools/x3extract.py "ISO/Xenosaga Episode III - Also sprach Zarathustra (USA) (Disc 1).iso" --out extracted/disc1/files --filter "\mnu\*" --filter "\jpg\*" --filter "\mg1\us\*" --filter "\mov\us\w09.png" --filter "\ef\esd\us\*" --filter "\ef\esp\us\*" --filter "\ef\map\us\*" --filter "\bat\bat_face\*"
-```
+Extract first (once; `tools/vorbereiten.py` already does this for the files the build needs):
 
 ```bash
+python -I tools/x3extract.py "ISO/Xenosaga Episode III - Also sprach Zarathustra (USA) (Disc 1).iso" --out extracted/disc1/files --filter "\mnu\*" --filter "\jpg\*" --filter "\mg1\us\*" --filter "\ef\esd\us\*" --filter "\ef\esp\us\*" --filter "\ef\map\us\*" --filter "\bat\bat_face\*"
 python -I tools/grafik_inventar.py
 ```
 
-Roundtrips (unverändert lesen → schreiben): `eftex.py test` 67/67 Effekt-Dateien identisch, `tm2.py test` 4/4 identisch, `xtx.py test` für `ctrl`, `itemcap`, `Picture`, `window0–2`, `titleobj` identisch.
+Round trips (read → write unchanged): `eftex.py test` 67/67 effect files identical, `tm2.py test` 4/4, `xtx.py test` for
+`ctrl`, `itemcap`, `Picture`, `window0–2`, `titleobj` identical.
 
-## Formate
+**Pillow and `python -I`:** if Pillow is installed in the user site-packages, isolated mode hides it. The graphics tools add
+exactly that one folder (`site.getusersitepackages()`); otherwise isolation stays in place.
 
-### Effekt-Container `.esd` / `.esp` (`ef/esd/us`, `ef/map/us`, `ef/esp/us`)
+## Formats
 
-Datensätze an 0x40er-Grenzen, jeweils 0x40-Byte-Kopf, danach Daten:
+### Effect containers `.esd` / `.esp` (`ef/esd/us`, `ef/map/us`, `ef/esp/us`)
+
+Records on 0x40 boundaries, each with a 0x40-byte header followed by data:
 
 ```
-+0x00 u32 Gesamtgröße (Kopf + Daten)   +0x04 u32 unklar (Adresse/Kennung)
-+0x08 u16 Typ: 4 = Bild, 3 = Palette   +0x0A u16 Platz
-+0x0C u16 Breite  +0x0E u16 Höhe       +0x10 u32 Bits je Pixel (4/8)
-+0x14 Name, z. B. "moji.bmp", "5thelsalem-a.bmp", "moji.clt"
++0x00 u32 total size (header + data)   +0x04 u32 unknown (address/ID)
++0x08 u16 type: 4 = image, 3 = palette +0x0A u16 slot
++0x0C u16 width  +0x0E u16 height      +0x10 u32 bits per pixel (4/8)
++0x14 name, e.g. "moji.bmp", "5thelsalem-a.bmp", "moji.clt"
 ```
 
-- Bilder: 4 Bit (unteres Nibble = linkes Pixel) oder 8 Bit, linear (kein Swizzle).
-- Paletten: RGBA32, Alpha 0x80 = deckend; Anzahl = 2^Bits (16 oder 256). Zuordnung über den Namensstamm (`x.bmp` ↔ `x.clt`), die Paletten stehen hinter den Bildern.
-- **Texte stecken in Deckkraftmasken:** Jede Einblendung besteht aus einem Farbbild (`moji.bmp`, Palette RGB, voll deckend) und einer Maske `<ortsname>-a.bmp` (Palette: schwarz mit Alphaskala 0…0xFE). Der Schriftzug ist nur in der Maske sichtbar.
-- 25 Gebietstitel (256×32, verzierte Schrift mit Schatten) in `ce0xx_9xx.esd` und den zugehörigen `ef*.esp`; 14 Kartenbeschriftungen (256×64, schlichte Schrift) in `ef1210/ef1218` (Orbitalaufzug) und `ef2310–ef2328` (Stadt). Dieselbe Maske steckt oft in mehreren Dateien (bis 5×).
-- Hinweis „Press ● button to enter this area.“ = `under-a.bmp` (256×64), 44 identische Kopien.
-- Japanische Reste: `ce006_999` (ゾハル・ダンジョン), `ce008_999` (ミルチア).
+- Images: 4 bit (low nibble = left pixel) or 8 bit, linear (no swizzle).
+- Palettes: RGBA32, alpha 0x80 = opaque; 2^bits entries. Matched by name stem (`x.bmp` ↔ `x.clt`); palettes follow the images.
+- **Text lives in opacity masks:** each title consists of a colour image (`moji.bmp`, opaque) and a mask `<name>-a.bmp`
+  (palette: black with an alpha ramp 0…0xFE). The lettering is only visible in the mask.
+- 25 area titles (256×32, ornate font with shadow) in `ce0xx_9xx.esd` and the related `ef*.esp`; 14 map labels (256×64, plain font)
+  in `ef1210/ef1218` and `ef2310–ef2328`. The same mask often appears in several files (up to 5×).
+- Hint "Press ● button to enter this area." = `under-a.bmp` (256×64), 44 identical copies.
+- Japanese leftovers: `ce006_999`, `ce008_999`.
 
 ### TIM2 `.tm2` (`mnu/pse`)
 
-Standard-TIM2 (siehe Kopf von `tools/tm2.py`). Alle vier Dateien sind RGBA32 (Bildtyp 3). Achtung: `logo_ep1/ep2` nutzen Alpha 0…0xFF, `logo_pp`/`haikei` die PS2-Skala 0…0x80 – `tm2.py` erkennt das je Bild.
+Standard TIM2 (see the header of `tools/tm2.py`). All four files are RGBA32 (image type 3). `logo_ep1/ep2` use alpha 0…0xFF,
+`logo_pp`/`haikei` the PS2 scale 0…0x80 – `tm2.py` detects this per image.
 
-### Eingebettete JPGs
+### Embedded JPGs
 
-- `mnu/credit.bin`: Kopf mit Offsets, 4 JPGs (Hersteller-Logos).
-- `mnu/diskchg.bin`: 1 JPG (Shion, Disc-Wechsel) + ADX-Sprachaufnahmen (`(c)CRI`).
+- `mnu/credit.bin`: header with offsets, 4 JPGs (company logos).
+- `mnu/diskchg.bin`: 1 JPG (disc change) + ADX voice data (`(c)CRI`).
 
-### Sonstiges
+### Other
 
-- `mnu/segcap.xtx`: Breite 246 passt nicht zum Swizzle, Inhalt unklar (vermutlich Segment-Bilder ohne Text).
-- `mnu/umn.txy`, `mnu/skillbg.bin`, `mnu/umn.bin`: 3D-Modelle (`Xc`/`pxy`/`txy`) mit Linientexturen, ohne Text.
+- `mnu/segcap.xtx`: width 246 does not match the swizzle; probably segment images without text.
+- `mnu/umn.txy`, `mnu/skillbg.bin`, `mnu/umn.bin`: 3D models (`Xc`/`pxy`/`txy`) with line textures, no text.
 
-## Ergebnis der Sichtung
+## Survey
 
-| Gruppe | Dateien | Englischer Text | Empfehlung |
+| Group | Files | English text | Tool |
 |---|---|---|---|
-| Titelbildschirm | `mnu/us/titleobj.xtx`, `title1.png` | NEW GAME … | erledigt |
-| Ortseinblendungen | `ef/esd/us/*.esd`, `ef/map/us/*.esp` | 25 Gebietstitel, 14 Kartenbeschriftungen, „Press ● button …“ | ja |
-| Figurenkarten | `mnu/intm/01–09.jpg`, `mnu/diskchg.bin` | „height“, „weight“ | optional (JPG → Pillow) |
-| Game Over | `mnu/us/gameov1.jpg` | GAME OVER | optional (JPG → Pillow) |
-| Kampfanzeige | `mnu/us/window0–2.xtx` | ATTACKER, RESERVE, ENEMY INFO, COMMAND, STOCK, BOOST, ANIMA, ACT | optional, eher nein (G3) |
-| Datenbankbilder | `jpg/us/dtimg_0150, 0151, 0176, 0237, 0244, 0245, 0250` | Titelkarten, Bildschirmtext | optional |
-| Tutorial-Screenshots | `jpg/us/dtimg_0431–0453` | Kampfoberfläche | nein |
-| Minispiel | `mg1/us/Picture.xtx` | SURREALISTIC PUZZLE ACTION | nein (Logo, Regel Block 6) |
-| Logos, Szenen, Porträts, Speicherbilder | `syno.png`, `w09.png`, `wall.jpg`, `logo_*.tm2`, `credit.bin`, `mnu/syno`, `mnu/pse/EP1/EP2`, `mcimg_*`, `bat_face`, `kao` | – / Marke | bleibt |
+| Title screen | `mnu/us/titleobj.xtx`, `title1.png` | NEW GAME, CONTINUE, DATA (+ optional credit line) | `titelbild.py` |
+| Location titles | `ef/esd/us/*.esd`, `ef/map/us/*.esp` | 25 area titles, 14 map labels, "Press ● button …" | `ortstitel.py` |
+| Character cards | `mnu/intm/01–09.jpg`, `mnu/diskchg.bin` | "height", "weight" | `figurenkarten.py` |
+| Database images | `jpg/us/dtimg_0150, 0151, 0176, 0237` (+ `1xxx` copies) | title cards, screen text | `dbbilder.py` |
+| Game Over | `mnu/us/gameov1.jpg` | GAME OVER | not covered |
+| Battle HUD | `mnu/us/window0–2.xtx` | ATTACKER, RESERVE, ENEMY INFO, COMMAND, STOCK, BOOST, ANIMA, ACT | not covered (shaded pixel font; letters G, H, L, R, V, "-" missing) |
+| Tutorial screenshots | `jpg/us/dtimg_0431–0453` | battle UI | not covered |
+| Minigame | `mg1/us/Picture.xtx` | SURREALISTIC PUZZLE ACTION | not covered (logo) |
+| Logos, scenes, portraits | `syno.png`, `wall.jpg`, `logo_*.tm2`, `credit.bin`, `mnu/syno`, `kao` … | – / trademarks | keep |
 
-`dtimg_1xxx` ist größtenteils eine Kopie der `0xxx`-Reihe (275 identisch); deren Tutorial-Bilder sind japanisch.
+`dtimg_1xxx` is mostly a copy of the `0xxx` series (275 identical); its tutorial images are Japanese.
 
-**Entscheidung des Nutzers (2026-11-16):** übersetzt werden **A** Ortseinblendungen, **B** Figurenkarten (height/weight), **D** Kampfanzeige, **E** Datenbank-Titelkarten.
-**Nicht** übersetzt: GAME OVER und andere typische Gaming-Begriffe, A.G.W.S. (inkl. „Assault Maneuver Weapon System“, `dtimg_0244/0245`) und Begriffe ohne offizielle deutsche Fassung, Tutorial-Screenshots, Minispiel-Logo.
-JPG-Bearbeitung mit Pillow (Nutzer hat der Installation zugestimmt, Pillow 13.0.0 von PyPI).
+## Title screen (`tools/titelbild.py`, `grafik_titel.json`)
 
-**Pillow und `python -I`:** Pillow liegt in den Benutzer-Paketen (`%APPDATA%\Python\Python314\site-packages`), die der isolierte Modus ausblendet. Die Grafik-Werkzeuge hängen diesen einen Ordner gezielt an (`site.getusersitepackages()`), sonst bleibt die Isolation unverändert.
+See `docs/formats/xtx.md`. Menu words are re-rendered with a Windows font, mapped to the font palette (which has a
+**shuffled** opacity order – always read it from the texture) and fitted to the original word's height and centre.
+`credit` adds an optional line above the unchanged copyright line in `title1.png`.
 
-## Block A: Ortseinblendungen (`tools/ortstitel.py`, `text/de/grafik_orte.json`)
+## Location titles (`tools/ortstitel.py`, `grafik_orte.json`)
 
-- 31 Masken (17 Gebietstitel Stil A, 13 Kartenbeschriftungen Stil B, 1 Hinweiszeile) in 49 Dateien. Eigennamen (Elsa, Durandal, Labyrinthos, Michtam, Rennes-le-Château, Miltia) bleiben, die zwei japanischen Reste ebenso.
-- Namen wie in Dialogen/Datenbank (Übersetzungsspeicher), z. B. „Klinik für akute Neurosen“, „Stadtgebiet A“, „Vector, S-Linien-Abteilung“. Hinweis: „Mit ● dieses Gebiet betreten.“ (Muster wie „Mit %button7 zum Anführer machen.“).
-- Schrift: Stil A **Courier New Bold** mit Schatten (+1/+1 und +2/+2, Deckkraft 64/254 wie im Original), Stil B **MS Gothic** (trifft das Original fast exakt: gemessene Stauchung 0,98).
-- Verfahren: Englischer Originaltext wird mit der Ersatzschrift auf Höhe und Breite der Originalmaske eingepasst (Größe + Stauchung); der deutsche Text übernimmt diese Werte, Grundlinie und Mitte. Zu lange Texte werden bis 250 px Breite zusätzlich gestaucht (z. B. „Abgelegene Forschungseinrichtung“). Das Tastensymbol ● wird aus der Originalmaske kopiert.
-- Deckkraft → Index über die Palette der jeweiligen Maske (nächstliegender Wert), nicht linear.
-- Dateigrößen bleiben gleich. Vorschau: `python -I tools/ortstitel.py --out <tmp> --vorschau build/grafik/orte`.
+- 31 masks (17 area titles style A, 13 map labels style B, 1 hint line) in 49 files. Leave untranslated proper nouns empty.
+- Fonts: style A **Courier New Bold** with shadow (+1/+1 and +2/+2, opacity 64/254 as in the original), style B **MS Gothic**
+  (matches the original almost exactly: measured squeeze 0.98).
+- Method: the English original is fitted with the replacement font to the height and width of the original mask (size + squeeze);
+  the translation takes over these values, baseline and centre. Texts that are too long are squeezed further up to 250 px.
+  The button symbol ● is copied from the original mask.
+- Opacity → index via the palette of each mask (nearest value), not linearly. File sizes stay the same.
+- Preview: `python -I tools/ortstitel.py --out <tmp> --vorschau build/grafik/orte`.
 
-## Block B: Figurenkarten (`tools/figurenkarten.py`, `text/de/grafik_figurenkarten.json`)
+## Character cards (`tools/figurenkarten.py`, `grafik_figurenkarten.json`)
 
-- `mnu/intm/01–09.jpg` und das JPG in `mnu/diskchg.bin` (gleiches Bild wie `intm/08.jpg`): „height :“/„weight :“ → „Größe:“/„Gewicht:“. Namen und Werte bleiben.
-- Suche über die Vorlage aus `intm/01.jpg` (nur Schriftpixel werden verglichen; Karte 09 hat zwei Figuren). „weight“ liegt immer 10 px unter „height“.
-- Alte Schrift samt dunklem Rand (Maske 2 px erweitert) wird von außen nach innen aus den Nachbarn aufgefüllt; erst alle Wörter löschen, dann neu setzen. Erste Fassung ließ auf `intm/03.jpg` (KOS-MOS vor hellem Haar) Reste des alten Rands stehen (Nutzer-Rückmeldung 2026-11-16). Neue Schrift: **Bahnschrift SemiBold**, 1,25-fach breit, Kanten nachgeschärft, Rand 1 px kräftig + 1 px schwach ohne Weichzeichnen (erste Korrektur mit weichgezeichnetem Rand wirkte laut Nutzer unscharf) (Original ist eine breite Eurostile-artige Schrift), eingepasst auf das englische Wort, dunkler Rand wie im Original.
-- JPG wird mit den Quantisierungstabellen und der 4:4:4-Unterabtastung des Originals gespeichert (`quality="keep"`), ohne EXIF/Photoshop-Metadaten; die Dateien werden dadurch ≈ 15 % kleiner. In `diskchg.bin` muss das JPG in den alten Platz passen (bis 0x181C0, danach ADX-Sprachdaten); der Rest wird mit Nullen gefüllt.
+- `mnu/intm/01–09.jpg` and the JPG in `mnu/diskchg.bin`: the words "height :"/"weight :" are replaced; names and values stay.
+- Located via a template from `intm/01.jpg` (only font pixels are compared; card 09 shows two characters). "weight" is always 10 px below "height".
+- The old lettering incl. its dark outline (mask widened by 2 px) is filled from the outside in from neighbouring pixels; all words
+  are erased first, then the new ones are drawn. Font: **Bahnschrift SemiBold**, 1.25× wide, sharpened edges, outline 1 px strong + 1 px soft.
+- The JPG is saved with the original quantisation tables and 4:4:4 subsampling (`quality="keep"`), without EXIF/Photoshop metadata.
+  In `diskchg.bin` the JPG must fit its old slot (up to 0x181C0, followed by ADX voice data); the rest is zero-filled.
 
-## Block E: Datenbankbilder (`tools/dbbilder.py`, `text/de/grafik_datenbank.json`)
+## Database images (`tools/dbbilder.py`, `grafik_datenbank.json`)
 
-| Bild | Original | Deutsch | Schrift |
-|---|---|---|---|
-| `dtimg_0150` (+1150) | Transgenic Type | Transgener Typ | Times New Roman, Schatten |
-| `dtimg_0176` (+1176) | R E A L I A N | R E A L I A N E R | Times New Roman, gesperrt, 18 px |
-| `dtimg_0237` (+1237) | TYPE 27 / COMBAT REALIAN | TYP 27 / KAMPF-REALIANER | Bahnschrift, 1,35-fach breit |
-| `dtimg_0151` (+1151) | Connection system NATARAJA now loading… / User name / Password | Verbindungssystem NATARAJA wird geladen… / Benutzername / Passwort (Passwort „Ye shall be as gods“ bleibt als Zitat) | Times New Roman fett, 12 px |
+| Image | Original | Font |
+|---|---|---|
+| `dtimg_0150` (+1150) | Transgenic Type | Times New Roman, shadow |
+| `dtimg_0176` (+1176) | R E A L I A N | Times New Roman, letter-spaced, 18 px |
+| `dtimg_0237` (+1237) | TYPE 27 / COMBAT REALIAN | Bahnschrift, 1.35× wide |
+| `dtimg_0151` (+1151) | Connection system NATARAJA now loading… / User name / Password | Times New Roman bold, 12 px |
 
-- Schriftpixel werden per Kontrast zum örtlichen Hintergrund (Median 9×9) erkannt und aus den Nachbarn aufgefüllt. Bei 0151 (Text auf hellem Bildschirm) wird stattdessen der ganze Textblock spaltenweise überblendet (`loeschbox`), weil die Kontrasterkennung Reste ließ.
-- Erst alle Zeilen messen, dann löschen, dann setzen (sonst misst Zeile 2 den neuen Text von Zeile 1 mit).
-- Identische Kopien in der 1xxx-Reihe werden mitgeschrieben (Bildnummer kommt aus den Datenbankdaten, Zuordnung unklar).
-
-## Block D: Kampfanzeige – bleibt englisch
-
-Entscheidung des Nutzers (2026-11-16): Grafiken mit schattierter Pixelschrift bleiben englisch, weil nachgebaute Buchstaben dort fremd aussehen würden. Betrifft `window0–2.xtx` (ATTACKER, RESERVE, ENEMY INFO, BOOST, COMMAND, STOCK, ANIMA, ACT).
-Notiz für später: Palettensuche per Glätte-Maß ergab (232, 96) als besten Kandidaten; die Buchstaben G, H, L, R, V und „-“ fehlen in diesem Stil.
+- Font pixels are detected by contrast against the local background (median 9×9) and filled from neighbours. For 0151 (text on a
+  bright screen) the whole text block is blended column-wise instead (`loeschbox`), because contrast detection left traces.
+- All lines are measured first, then erased, then drawn (otherwise line 2 would measure the new text of line 1).
+- Identical copies in the `1xxx` series are written too.

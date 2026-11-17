@@ -1,5 +1,5 @@
-// Dekompiliert die Funktionen, die die angegebenen Adressen enthalten, und listet ihre Aufrufer.
-// Aufruf: ... -postScript DecompileAt.java 0x299b34 [0x...]
+// Decompiles the functions containing the given addresses and lists their callers.
+// Usage: ... -postScript DecompileAt.java 0x299b34 [0x...]
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.DecompInterface;
 import ghidra.program.model.listing.Function;
@@ -14,7 +14,7 @@ public class DecompileAt extends GhidraScript {
         for (String a : getScriptArgs()) {
             Address addr = toAddr(a);
             Function f = getFunctionContaining(addr);
-            if (f == null) { println("Keine Funktion bei " + a); continue; }
+            if (f == null) { println("No function at " + a); continue; }
             println("=== " + f.getName() + " @ " + f.getEntryPoint() + " (enthaelt " + a + ")");
             StringBuilder callers = new StringBuilder();
             for (Reference r : getReferencesTo(f.getEntryPoint())) {

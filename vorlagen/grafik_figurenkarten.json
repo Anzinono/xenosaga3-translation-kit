@@ -1,5 +1,5 @@
 {
-  "_hinweis": "Figurenkarten (mnu/intm/01-09.jpg, Disc-Wechsel mnu/diskchg.bin): Beschriftung 'height :' / 'weight :' ersetzen. Namen und Werte bleiben. Erzeugt von tools/figurenkarten.py, siehe docs/grafik.md.",
+  "_hinweis": "Character cards (mnu/intm/01-09.jpg, disc change mnu/diskchg.bin): replace the labels 'height :' / 'weight :' with the words in 'woerter' (= words). Names and values stay. Both empty = originals stay. Used by tools/figurenkarten.py, see docs/grafik.md.",
   "schrift": "bahnschrift.ttf",
   "variante": "SemiBold",
   "breite_faktor": 1.25,

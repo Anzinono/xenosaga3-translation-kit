@@ -1,19 +1,19 @@
-"""Datenbanktexte (mnu/us/DBC.bin, DBC2.bin) exportieren und wieder einsetzen.
+"""Export and re-insert database text (mnu/us/DBC.bin, DBC2.bin).
 
-Format (siehe docs/formats/datenbank.md):
-  Container: u32 Anzahl Blöcke, Anzahl x (u32 Offset, u32 Größe), Füllung 0x90 auf 16 Byte,
-             Blöcke auf 16 Byte ausgerichtet (Füllung 0x90), letzter Block ohne Füllung.
-  Block:     n Datensätze à 0xD0 Byte ("DBF\\0" ...), der letzte nur 0xC8 Byte,
-             danach nullterminierte Strings (Windows-1252).
-  Datensatz: u32-Felder; Felder 3, 5, 9, 10, 11-14 sind String-Offsets relativ zum Blockanfang
-             (3 Kategorie, 5 Titel, 9 Kurzbeschreibung, 10 Langtext, 11-14 meist "-1").
+Format (see docs/formats/datenbank.md):
+  container: u32 number of blocks, count x (u32 offset, u32 size), padding 0x90 to 16 bytes,
+             blocks aligned to 16 bytes (padding 0x90), last block without padding.
+  block:     n records of 0xD0 bytes ("DBF\\0" ...), the last one only 0xC8 bytes,
+             followed by null-terminated strings (Windows-1252).
+  record:    u32 fields; fields 3, 5, 9, 10, 11-14 are string offsets relative to the block start
+             (3 category, 5 title, 9 short description, 10 long text, 11-14 mostly "-1").
 
-DBC2.bin enthält dieselben Texte anders gruppiert. Die Übersetzung wird deshalb über den
-englischen Text zugeordnet und auf beide Dateien angewandt.
+DBC2.bin contains the same texts grouped differently. The translation is therefore matched via the
+English text and applied to both files.
 
-Befehle:
+Commands:
   export  python tools/dbctext.py export <DBC.bin> --out text/en/datenbank.csv
-  import  python tools/dbctext.py import <DBC.bin> <DBC2.bin> --csv übersetzt.csv --out <zielordner>
+  import  python tools/dbctext.py import <DBC.bin> <DBC2.bin> --csv translated.csv --out <target folder>
   test    python tools/dbctext.py test <DBC.bin> <DBC2.bin>
 """
 from __future__ import annotations
@@ -59,7 +59,7 @@ def parse_block(b: bytes) -> tuple[int, list[list[int]], dict[int, bytes]]:
     while b[n * REC:n * REC + 4] == b"DBF\0":
         n += 1
     if n == 0:
-        raise SBError("Block ohne DBF-Datensätze")
+        raise SBError("Block without DBF records")
     recs = [list(struct.unpack_from("<50I", b, r * REC)) for r in range(n)]
     strings: dict[int, bytes] = {}
     for w in recs:
@@ -74,7 +74,7 @@ def build_block(b: bytes, n: int, recs: list[list[int]], strings: dict[int, byte
     text_start = (n - 1) * REC + RECLEN
     new_off: dict[int, int] = {}
     blob = bytearray()
-    for o in sorted(strings):                     # ursprüngliche Reihenfolge beibehalten
+    for o in sorted(strings):                     # keep the original order
         new_off[o] = text_start + len(blob)
         blob += strings[o] + b"\0"
     out = bytearray(b[:text_start])
@@ -115,7 +115,7 @@ def cmd_export(args) -> int:
         for raw, r in rows.items():
             wr.writerow([r["eintrag"], r["feld"], r["vorkommen"], decode_game(raw), ""])
     words = sum(len(decode_game(k).replace("\\n", " ").split()) for k in rows)
-    print(f"{len(rows)} eindeutige Texte ({words} Wörter) nach {out}", file=sys.stderr)
+    print(f"{len(rows)} unique texts ({words} words) -> {out}", file=sys.stderr)
     return 0
 
 
@@ -126,20 +126,20 @@ def cmd_import(args) -> int:
         for row in csv.DictReader(fh, delimiter=";"):
             if row.get(COL, "").strip():
                 try:
-                    # Schlüssel wie beim Export dekodiert (2-Byte-Symbole wie β), daher encode_de statt cp1252
-                    key = encode_de(row["text_en"], f"Eintrag {row['eintrag']} {row['feld']} (en)")
-                    mapping[key] = encode_de(row[COL], f"Eintrag {row['eintrag']} {row['feld']}")
+                    # key decoded like the export (2-byte symbols such as β), hence encode_de instead of cp1252
+                    key = encode_de(row["text_en"], f"entry {row['eintrag']} {row['feld']} (en)")
+                    mapping[key] = encode_de(row[COL], f"entry {row['eintrag']} {row['feld']}")
                 except SBError as e:
                     errors.append(str(e))
     for e in errors:
-        print("FEHLER:", e, file=sys.stderr)
+        print("ERROR:", e, file=sys.stderr)
     if errors:
         return 1
     out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
     for f in args.files:
         p = Path(f)
         (out / p.name).write_bytes(translate_file(p.read_bytes(), mapping))
-    print(f"{len(mapping)} Übersetzungen auf {len(args.files)} Dateien angewandt -> {out}", file=sys.stderr)
+    print(f"{len(mapping)} translations applied to {len(args.files)} files -> {out}", file=sys.stderr)
     return 0
 
 
@@ -148,7 +148,7 @@ def cmd_test(args) -> int:
     for f in args.files:
         data = Path(f).read_bytes()
         same = translate_file(data, {}) == data
-        # Verlängerungstest: jeden Titel verlängern, danach müssen alle Texte stimmen
+        # lengthening test: lengthen every title, afterwards all texts must match
         titles = {}
         for b in split_container(data):
             _, recs, strings = parse_block(b)
@@ -166,7 +166,7 @@ def cmd_test(args) -> int:
                     expect = titles.get(s_old[w_old[fld]], s_old[w_old[fld]])
                     if s_new[w_new[fld]] != expect:
                         ok = False
-        print(f"{Path(f).name}: Roundtrip {'identisch' if same else 'ABWEICHEND'}, Verlängerung {'ok' if ok else 'FEHLER'}", file=sys.stderr)
+        print(f"{Path(f).name}: round trip {'identical' if same else 'DIFFERENT'}, lengthening {'ok' if ok else 'ERROR'}", file=sys.stderr)
         bad += (not same) + (not ok)
     return 1 if bad else 0
 

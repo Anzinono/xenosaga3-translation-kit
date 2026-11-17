@@ -1,4 +1,4 @@
-"""PNG lesen ohne Zusatzpakete: 8-Bit Graustufen, RGB, RGBA, Palette, Graustufen+Alpha -> RGBA-Zeilen."""
+"""PNG reader without extra packages: 8-bit grayscale, RGB, RGBA, palette, grayscale+alpha -> RGBA rows."""
 from __future__ import annotations
 
 import struct
@@ -11,7 +11,7 @@ _CH = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}
 def read_png_rgba(path: Path) -> tuple[int, int, list[bytearray]]:
     d = Path(path).read_bytes()
     if d[:8] != b"\x89PNG\r\n\x1a\n":
-        raise ValueError(f"{path}: kein PNG")
+        raise ValueError(f"{path}: not a PNG")
     pos, idat, plte, trns = 8, b"", b"", b""
     w = h = ctype = 0
     while pos < len(d):
@@ -20,7 +20,7 @@ def read_png_rgba(path: Path) -> tuple[int, int, list[bytearray]]:
         if typ == b"IHDR":
             w, h, depth, ctype, _, _, inter = struct.unpack(">IIBBBBB", body)
             if depth != 8 or inter or ctype not in _CH:
-                raise ValueError(f"{path}: nur 8-Bit-PNG ohne Interlace unterstützt")
+                raise ValueError(f"{path}: only 8-bit PNG without interlace is supported")
         elif typ == b"PLTE":
             plte = body
         elif typ == b"tRNS":

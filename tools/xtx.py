@@ -1,19 +1,19 @@
-"""XTX-Texturen (Format 0x08: geswizzeltes 8-Bit-Bild mit 256-Farben-Palette) lesen und schreiben.
+"""Read and write XTX textures (format 0x08: swizzled 8-bit image with 256-colour palette).
 
-Format (siehe docs/formats/xtx.md). Header- und Swizzle-Logik nach
+Format (see docs/formats/xtx.md). Header and swizzle logic after
 LinuxJessi/Xenosaga3PythonExtractor, xtx_decode.py (MIT, Copyright (c) 2026 Jessi Ray Godsibb):
-  0x00 "XTX\\0", 0x04 u32 Dateigröße, 0x08 u32 Anzahl (1), 0x0C u32 0x10,
-  0x10 u16 Breite W, 0x12 u16 Format (0x04 linear RGBA, 0x08 swizzled 8 bpp), 0x14 u32 Höhe H,
-  0x20 u32 Datenoffset (0x30). Daten: W*H*4 Byte "CT32-Fläche"; danach Restbytes.
-  Format 0x08: Die Fläche enthält ein PSMT8-Bild der Größe (2W) x (2H) (PS2-Speicheranordnung)
-  und irgendwo eine 256-Farben-Palette als 16x16-Kachel (CT32, CSM1-Reihenfolge).
+  0x00 "XTX\\0", 0x04 u32 file size, 0x08 u32 count (1), 0x0C u32 0x10,
+  0x10 u16 width W, 0x12 u16 format (0x04 linear RGBA, 0x08 swizzled 8 bpp), 0x14 u32 height H,
+  0x20 u32 data offset (0x30). Data: W*H*4 bytes "CT32 area"; then remaining bytes.
+  Format 0x08: the area holds a PSMT8 image of size (2W) x (2H) (PS2 memory layout)
+  and somewhere a 256-colour palette as a 16x16 tile (CT32, CSM1 order).
 
-Befehle:
-  export  python tools/xtx.py export <datei.xtx> --out <ordner> [--palette X,Y]
-          -> <name>_index.png (Graustufen der Indizes), <name>.png (Farbe, wenn Palette gefunden)
-  import  python tools/xtx.py import <datei.xtx> <index.png> --out <neu.xtx>
-          -> schreibt ein 8-Bit-Indexbild (PNG, Graustufen = Index) zurück; Palette bleibt unverändert
-  test    python tools/xtx.py test <datei.xtx> [...]   (export -> import muss byte-identisch sein)
+Commands:
+  export  python tools/xtx.py export <file.xtx> --out <folder> [--palette X,Y]
+          -> <name>_index.png (indices as grayscale), <name>.png (colour, if a palette was found)
+  import  python tools/xtx.py import <file.xtx> <index.png> --out <new.xtx>
+          -> writes back an 8-bit index image (PNG, grayscale = index); the palette stays unchanged
+  test    python tools/xtx.py test <file.xtx> [...]   (export -> import must be byte-identical)
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ import zlib
 from pathlib import Path
 
 
-# ---------------------------------------------------------------- PNG (ohne Zusatzpakete)
+# ---------------------------------------------------------------- PNG (no extra packages)
 def write_png(path: Path, w: int, h: int, rows: list[bytes], rgba: bool = False) -> None:
     raw = b"".join(b"\0" + r for r in rows)
 
@@ -38,10 +38,10 @@ def write_png(path: Path, w: int, h: int, rows: list[bytes], rgba: bool = False)
 
 
 def read_png_gray(path: Path) -> tuple[int, int, bytes]:
-    """Liest ein 8-Bit-PNG (Graustufen, Typ 0, ohne Interlace) -> (w, h, pixel)."""
+    """Reads an 8-bit PNG (grayscale, type 0, no interlace) -> (w, h, pixels)."""
     data = path.read_bytes()
     if data[:8] != b"\x89PNG\r\n\x1a\n":
-        raise ValueError("kein PNG")
+        raise ValueError("not a PNG")
     pos, idat, w, h = 8, b"", 0, 0
     while pos < len(data):
         ln = struct.unpack(">I", data[pos:pos + 4])[0]
@@ -49,7 +49,7 @@ def read_png_gray(path: Path) -> tuple[int, int, bytes]:
         if typ == b"IHDR":
             w, h, depth, ctype, _, _, inter = struct.unpack(">IIBBBBB", body)
             if depth != 8 or ctype != 0 or inter:
-                raise ValueError("Index-PNG muss 8-Bit-Graustufen ohne Interlace sein")
+                raise ValueError("index PNG must be 8-bit grayscale without interlace")
         elif typ == b"IDAT":
             idat += body
         pos += 12 + ln
@@ -79,7 +79,7 @@ def read_png_gray(path: Path) -> tuple[int, int, bytes]:
 # ---------------------------------------------------------------- XTX
 def parse(data: bytes) -> tuple[int, int, int, int]:
     if data[:4] != b"XTX\0":
-        raise ValueError("keine XTX-Datei")
+        raise ValueError("not an XTX file")
     w = struct.unpack_from("<H", data, 16)[0]
     fmt = struct.unpack_from("<H", data, 18)[0]
     h = struct.unpack_from("<I", data, 20)[0]
@@ -90,7 +90,7 @@ def parse(data: bytes) -> tuple[int, int, int, int]:
 
 
 def swizzle8_offset(canvas_w: int, x: int, y: int) -> int:
-    """Byte-Offset des PSMT8-Pixels (x, y) in der CT32-Fläche (PS2 'unswizzle8')."""
+    """Byte offset of PSMT8 pixel (x, y) in the CT32 area (PS2 'unswizzle8')."""
     tw = canvas_w * 2
     block_row = (y & ~0xF) * tw
     swap_selector = (((y + 2) >> 2) & 1) * 4
@@ -128,7 +128,7 @@ def clut_at(canvas: bytes, canvas_w: int, px: int, py: int) -> list[tuple[int, i
 
 
 def find_cluts(canvas: bytes, canvas_w: int, canvas_h: int) -> list[tuple[int, int]]:
-    """Kandidaten für Palettenkacheln: 16x16 CT32, Alpha <= 0x80, mindestens 64 Farben."""
+    """Candidates for palette tiles: 16x16 CT32, alpha <= 0x80, at least 64 colours."""
     found = []
     for py in range(0, canvas_h - 15, 8):
         for px in range(0, canvas_w - 15, 8):
@@ -153,7 +153,7 @@ def cmd_export(args) -> int:
     data = p.read_bytes()
     w, fmt, h, off = parse(data)
     if fmt != 0x08:
-        raise SystemExit(f"Format {fmt:#x} wird noch nicht unterstützt (nur 0x08)")
+        raise SystemExit(f"Format {fmt:#x} is not supported yet (only 0x08)")
     canvas = data[off:off + w * h * 4]
     ow, oh = w * 2, h * 2
     idx = unswizzle8(canvas, w, ow, oh)
@@ -161,7 +161,7 @@ def cmd_export(args) -> int:
     out.mkdir(parents=True, exist_ok=True)
     write_png(out / f"{p.stem}_index.png", ow, oh, [idx[y * ow:(y + 1) * ow] for y in range(oh)])
     cands = [tuple(map(int, args.palette.split(",")))] if args.palette else find_cluts(canvas, w, h)
-    print(f"{p.name}: {w}x{h} Fläche, Bild {ow}x{oh}, Palettenkandidaten (x,y in Flächenpixeln): {cands[:10]}", file=sys.stderr)
+    print(f"{p.name}: {w}x{h} area, image {ow}x{oh}, palette candidates (x,y in area pixels): {cands[:10]}", file=sys.stderr)
     if cands:
         pal = clut_at(canvas, w, *cands[0])
         rows = [b"".join(bytes(pal[i]) for i in idx[y * ow:(y + 1) * ow]) for y in range(oh)]
@@ -175,7 +175,7 @@ def cmd_export(args) -> int:
 def build(data: bytes, idx: bytes) -> bytes:
     w, fmt, h, off = parse(data)
     if len(idx) != w * 2 * h * 2:
-        raise ValueError(f"Indexbild hat falsche Größe (erwartet {w * 2}x{h * 2})")
+        raise ValueError(f"index image has the wrong size (expected {w * 2}x{h * 2})")
     canvas = bytearray(data[off:off + w * h * 4])
     swizzle8(canvas, w, idx, w * 2, h * 2)
     return data[:off] + bytes(canvas) + data[off + w * h * 4:]
@@ -186,7 +186,7 @@ def cmd_import(args) -> int:
     pw, ph, idx = read_png_gray(Path(args.png))
     w, _, h, _ = parse(data)
     if (pw, ph) != (w * 2, h * 2):
-        raise SystemExit(f"PNG ist {pw}x{ph}, erwartet {w * 2}x{h * 2}")
+        raise SystemExit(f"PNG is {pw}x{ph}, expected {w * 2}x{h * 2}")
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_bytes(build(data, idx))
     return 0
@@ -198,14 +198,14 @@ def cmd_test(args) -> int:
         data = Path(f).read_bytes()
         w, fmt, h, off = parse(data)
         if fmt != 0x08:
-            print(f"{Path(f).name}: Format {fmt:#x} übersprungen", file=sys.stderr)
+            print(f"{Path(f).name}: format {fmt:#x} skipped", file=sys.stderr)
             continue
         idx = unswizzle8(data[off:off + w * h * 4], w, w * 2, h * 2)
         same = build(data, idx) == data
-        # Abbildung muss eine Bijektion sein (jedes Byte der Fläche genau einmal)
+        # the mapping must be a bijection (every byte of the area exactly once)
         offs = {swizzle8_offset(w, x, y) for y in range(h * 2) for x in range(w * 2)}
         biject = len(offs) == w * h * 4 and max(offs) == w * h * 4 - 1
-        print(f"{Path(f).name}: Roundtrip {'identisch' if same else 'ABWEICHEND'}, Swizzle bijektiv: {biject}", file=sys.stderr)
+        print(f"{Path(f).name}: round trip {'identical' if same else 'DIFFERENT'}, swizzle bijective: {biject}", file=sys.stderr)
         bad += (not same) + (not biject)
     return 1 if bad else 0
 

@@ -1,52 +1,52 @@
-# Kampfdaten `bat/us/batdat.bin`
+# Battle data `bat/us/batdat.bin`
 
-Enthält die Namen und Beschreibungen von Äthern, Techs, Spezialangriffen, Gegenständen, Statuseffekten, Fähigkeiten, Ausrüstung, E.S.-Teilen, Kampfbefehlen und Sondergegenständen. Die Datei liegt im gemeinsamen Archiv (beide Discs), Größe 125 764 Byte.
+Contains names and descriptions of ether, techs, special attacks, items, status changes, skills, equipment, E.S. parts, battle
+commands and special items. The file lives in the shared archive (both discs), size 125 764 bytes.
 
-Werkzeug: `tools/batdattext.py` (export / import / test), Tabelle `text/en/kampfdaten.csv` → `text/de/kampfdaten.csv`, in `tools/build.py` eingebunden.
+Tool: `tools/batdattext.py` (export / import / test), table `text/en/kampfdaten.csv` → `text/<code>/kampfdaten.csv`, used by `tools/build.py`.
 
-## Aufbau
+## Structure
 
-| Offset | Inhalt |
+| Offset | Content |
 |---|---|
-| `0x00` | u32 Anzahl Abschnitte (28) |
-| `0x04` | u32 Dateigröße |
-| `0x08` | u32 Startoffset je Abschnitt (der erste ist `0x78`). Abschnitte liegen lückenlos hintereinander, Länge immer ein Vielfaches von 4. |
+| `0x00` | u32 number of sections (28) |
+| `0x04` | u32 file size |
+| `0x08` | u32 start offset per section (the first is `0x78`). Sections follow each other without gaps; each length is a multiple of 4. |
 
-Jeder Abschnitt mit Text: **Datensätze fester Länge**, danach ein **Textbereich** mit NUL-getrennten Strings (cp1252 wie überall, `\n` als zwei Zeichen Backslash + n, Steuerfolgen `$col…;`, `$zoomA,B;`). Zeiger sind **u16-Offsets relativ zum Abschnittsanfang**. Der erste Zeiger des ersten Datensatzes zeigt auf den Textanfang. Mehrere Datensätze dürfen denselben String nutzen (Abschnitt 5: 612 Zeiger auf 357 Strings).
+Every section with text: **fixed-length records** followed by a **text area** with NUL-separated strings (cp1252 as everywhere, `\n`
+as backslash + n, control sequences `$col…;`, `$zoomA,B;`). Pointers are **u16 offsets relative to the section start**. The first
+pointer of the first record points to the start of the text. Several records may share a string (section 5: 612 pointers to 357 strings).
 
-| Abschnitt | Satzlänge | Zeigerfelder | Inhalt |
+| Section | Record length | Pointer fields | Content |
 |---|---|---|---|
-| 0 | – | – | Werte der Figuren, Namen (Shion … E.S. Reuben), nicht exportiert |
-| 4 | 32 | 0 | Techs der Figuren + Werte-Beschreibungen |
-| 5 | 32 | 0 | Angriffe von Gegnern und E.S. |
-| 6 | 32 | 0 Name, 2 Text | Äther |
-| 7 | 40 | 0, 2 | Techs |
-| 8 | 40 | 0, 2 | Spezialangriffe |
-| 9 | 40 | 0, 2 | Gegenstände |
-| 10 | 8 | 0, 2 | Statusveränderungen |
-| 11 | 8 | 0, 2 | Statuseffekte (Anima/Status-Unterstützung) |
-| 12 | 20 | 0, 2 | Fähigkeiten (Skills) |
-| 13 | 20 | 0, 2 | Accessoires |
-| 14 | 28 | 0, 2 | Waffen (Figuren und E.S.) |
-| 15 | 24 | 0, 2 | Rüstungen |
-| 16–19 | 20/20/20/24 | 0, 2 | E.S.-Rahmen, Generatoren, CPU, Disks |
-| 23 | 2 | 0 | Zeigerliste: Kampfbefehle und Kampfmeldungen (Name/Erklärung im Wechsel) |
-| 27 | 8 | 0, 2 | Sondergegenstände |
-| 1–3, 20–22, 24–26 | – | – | ohne Text (Gegnerwerte, Tabellen) |
+| 0 | – | – | character stats and names (Shion … E.S. Reuben), not exported |
+| 4 | 32 | 0 | character techs + stat descriptions |
+| 5 | 32 | 0 | enemy and E.S. attacks |
+| 6 | 32 | 0 name, 2 text | ether |
+| 7 | 40 | 0, 2 | techs |
+| 8 | 40 | 0, 2 | special attacks |
+| 9 | 40 | 0, 2 | items |
+| 10 | 8 | 0, 2 | status changes |
+| 11 | 8 | 0, 2 | status effects (anima/status support) |
+| 12 | 20 | 0, 2 | skills |
+| 13 | 20 | 0, 2 | accessories |
+| 14 | 28 | 0, 2 | weapons (characters and E.S.) |
+| 15 | 24 | 0, 2 | armour |
+| 16–19 | 20/20/20/24 | 0, 2 | E.S. frames, generators, CPU, disks |
+| 23 | 2 | 0 | pointer list: battle commands and battle messages (name/explanation alternating) |
+| 27 | 8 | 0, 2 | special items |
+| 1–3, 20–22, 24–26 | – | – | no text (enemy stats, tables) |
 
-Gefunden durch Prüfung aller Satzlängen: Für die genannten Abschnitte zeigt das Feld in **jedem** Datensatz auf einen Stringanfang, und jeder String wird referenziert. Das Tool prüft beides beim Laden und bricht sonst ab.
+Found by testing all record lengths: for the sections listed, the field points to a string start in **every** record and every string
+is referenced. The tool checks both when loading and aborts otherwise.
 
 ## Import
 
-Neue Strings werden in Originalreihenfolge in den Textbereich geschrieben, die Zeiger neu gesetzt, der Abschnitt auf 4 Byte aufgefüllt; Kopf und Startoffsets werden neu berechnet. Grenze: ein Abschnitt darf 64 KiB nicht überschreiten (u16-Zeiger), der größte hat 24 KiB.
+New strings are written to the text area in original order, pointers are updated, the section is padded to 4 bytes; header and start
+offsets are recomputed. Limit: a section must not exceed 64 KiB (u16 pointers); the largest has 24 KiB.
 
-`python -I tools/batdattext.py test extracted/disc1/files/bat/us/batdat.bin`: Roundtrip byte-identisch, Verlängerung aller Strings um 7 Zeichen wird korrekt zurückgelesen.
-Deutsche Fassung 2026-11-15: 126 708 Byte (+944).
+`python -I tools/batdattext.py test extracted/disc1/files/bat/us/batdat.bin`: round trip byte-identical; lengthening every string by
+7 characters reads back correctly. A grown file (+944 bytes, German) runs in PCSX2: battles start, command bar, explanations and
+item/ether descriptions are shown correctly.
 
-## Test in PCSX2
-
-2026-11-15: Gewachsene Datei (+944 Byte) läuft. Kampf startet, Befehlsleiste und Erklärungen deutsch, Item-/Äther-Beschreibungen korrekt.
-
-## Offen
-
-- „COMMAND“, „BOOST“, „PLAYER/ENEMY“, „ACT“ im Kampf sind Grafiken (Texturen), kein Text in `batdat.bin`. Gehören zu Phase 5 (Grafiken mit Text).
+"COMMAND", "BOOST", "PLAYER/ENEMY", "ACT" in battle are graphics (textures), not text in `batdat.bin` – see `docs/grafik.md`.

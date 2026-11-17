@@ -1,9 +1,9 @@
-"""Pixelbreite von Spieltext im Standard-Font (font0).
+"""Pixel width of game text in the standard font (font0).
 
-Breiten aus extracted/font0/breiten.csv (nicht im Repo, entsteht beim Font-Export, siehe
-docs/formats/font.md). Glyphenzuordnung: Ziffern ab Glyphe 128, A–Z ab 138, a–z ab 164,
-Satzzeichen in JIS-Zeile-1-Reihenfolge; Abstand 4 px je Zeichen, Leerzeichen 2 px.
-Gemessen am Spiel: Cutscene-Box mit Porträt ≈ 384 px, Datenbank-Langtext ≈ 630 px.
+Widths from extracted/font0/breiten.csv (not in the repo, created by the font export, see
+docs/formats/font.md). Glyph mapping: digits from glyph 128, A–Z from 138, a–z from 164,
+punctuation in JIS row-1 order; spacing 4 px per character, space 2 px.
+Measured in the game: cutscene box with portrait ≈ 384 px, database long text ≈ 630 px.
 """
 from __future__ import annotations
 
@@ -55,9 +55,9 @@ def char_width(c: str) -> int:
 
 
 def width(text: str, links_visible: bool = False) -> int:
-    """Breite einer Zeile in Pixeln. Steuerzeichen zählen nicht; links_visible=True für die
-    Datenbank, deren Verweise <Name> als Text erscheinen."""
+    """Width of a line in pixels. Control codes do not count; links_visible=True for the
+    database, whose links <Name> appear as text."""
     if links_visible:
         text = text.replace("<", "").replace(">", "")
-    text = re.sub(r"<k([^>]*)>", lambda m: m.group(1), text)  # Dialog-Verweise <k…> werden angezeigt
+    text = re.sub(r"<k([^>]*)>", lambda m: m.group(1), text)  # dialogue links <k…> are displayed
     return sum(char_width(c) + GAP for c in TAG.sub("", text))

@@ -1,59 +1,67 @@
-# Menütexte und Datenbank (`\mnu\us\`)
+# Menu text, small text containers, minigame and recaps (`\mnu\us\`, `\mg1\us\`, `\mnu\pse\us\`)
 
-## .txd – Texttabellen (Tool: `tools/txdtext.py`)
+## .txd – text tables (tool: `tools/txdtext.py`)
 
-| Datei | Variante | Strings | Inhalt |
+| File | Variant | Strings | Content |
 |---|---|---|---|
-| `menutext.txd` | A | 907 | Menüs, Items, Meldungen (`Acquired %s x %d!`) |
-| `synopsis.txd` | B | 166 | Zusammenfassungen der Vorgeschichte, mit `$`-Befehlen für Layout |
-| `devchk.txd` | B | 20 | Memory Card, Progressive Scan, Controller |
-| `discchg.txd` | B | 13 | Discwechsel |
+| `menutext.txd` | A | 907 | menus, items, messages (`Acquired %s x %d!`) |
+| `synopsis.txd` | B | 166 | story summaries, with `$` commands for layout |
+| `devchk.txd` | B | 20 | memory card, progressive scan, controller |
+| `discchg.txd` | B | 13 | disc change |
 
-- **Variante A:** `u32 Anzahl`, `Anzahl × u32` absolute Offsets, dann die Strings.
-- **Variante B:** `Anzahl × u32` absolute Offsets, wobei der erste Offset der Tabellenlänge entspricht. Danach die Strings.
+- **Variant A:** `u32 count`, `count × u32` absolute offsets, then the strings.
+- **Variant B:** `count × u32` absolute offsets where the first offset equals the table length, then the strings.
 
-Mehrfach verwendete Offsets bleiben beim Neubau zusammengefasst. Der Roundtrip ist für alle 4 Dateien identisch, verlängerte Texte werden korrekt gelesen.
-Steuerzeichen im Text: `\31\3` (Präfix), `\n`, `\button0`, `\m` (Platzhalter), `$ax…;$ay…;$col…;` (Layout). Diese bleiben unverändert.
-Export: `text/en/menue_txd.csv` (1 106 Strings, Kategorien `text`/`befehl`/`leer`).
+Shared offsets stay shared when rebuilding. The round trip is identical for all 4 files; lengthened texts are read back correctly.
+Some entries separate lines with **CR+LF** – the tools keep these line endings; when editing a table make sure your editor does not
+drop the CR inside a cell (a missing CR shifted the cutscene pause display).
+Control codes in the text: `\31\3` (prefix), `\n`, `\button0`, `\m` (placeholder), `$ax…;$ay…;$col…;` (layout) – keep unchanged.
+Export: `text/en/menue_txd.csv` (1 106 strings, categories `text`/`befehl` (command)/`leer` (empty)).
 
-## .bin-Container (DBC.bin, DBC2.bin, njDataText.bin, MVtext.bin, SegmentFileData.bin, njBtlText.bin, njDBcommon.bin)
+## .bin containers (DBC.bin, DBC2.bin, njDataText.bin, MVtext.bin, SegmentFileData.bin, njBtlText.bin, njDBcommon.bin)
 
 ```
-u32 Anzahl Blöcke
-Anzahl × (u32 Offset, u32 Größe)
-Füllung 0x90 bis zur 16-Byte-Grenze
-Blöcke (jeweils auf 16 Byte ausgerichtet, Füllung 0x90)
+u32 number of blocks
+count × (u32 offset, u32 size)
+padding 0x90 up to a 16-byte boundary
+blocks (each aligned to 16 bytes, padding 0x90)
 ```
 
-| Datei | Blöcke | Text (grob) |
+| File | Blocks | Text (approx.) |
 |---|---|---|
-| `DBC.bin` | 10 | ≈ 56 000 Wörter (Datenbank) |
-| `DBC2.bin` | 27 | ≈ 56 000 Wörter (zweite Fassung der Datenbank; das koreanische Projekt baut beide gemeinsam) |
-| `njDataText.bin` | 13 | ≈ 1 250 Wörter (Bonusmenü, Datensätze `TOP`) |
-| `MVtext.bin` | 4 | ≈ 450 Wörter (Filmauswahl) |
-| `SegmentFileData.bin` | 2 | ≈ 400 Wörter (Segment-Adressen, Datensätze `SEG`) |
-| `njBtlText.bin`, `njDBcommon.bin` | 1 | Überschriften |
+| `DBC.bin` | 10 | ≈ 56 000 words (database) |
+| `DBC2.bin` | 27 | the same texts as alphabetical index |
+| `njDataText.bin` | 13 | ≈ 1 250 words (bonus menu, records `TOP`) |
+| `MVtext.bin` | 4 | ≈ 450 words (movie selection) |
+| `SegmentFileData.bin` | 2 | ≈ 400 words (segment addresses, records `SEG`) |
+| `njBtlText.bin`, `njDBcommon.bin` | 1 | headings |
 
-In den Blöcken stehen Datensätze mit Kennung (`DBF\0`, `SEG\0`, `TOP\0`), String-Offsets relativ zum Block und Zahlen.
-- `DBC.bin`/`DBC2.bin`: siehe [datenbank.md](datenbank.md) (eigenes Tool `dbctext.py`).
-- Übrige Dateien: generisches Tool **`tools/bintext.py`**. Jeder Block ist eine von zwei Bauarten:
-  - **Tabelle:** u32-Offsets (relativ zum Block), der erste Offset entspricht der Tabellenlänge, danach die Strings. Betrifft `njBtlText`, `njDBcommon`, den letzten Block von `SegmentFileData`/`MVtext`/`njDataText`.
-  - **Datensätze:** Kennung (`SEG` 48 B, `MVD` 48 B, `TOP` 32 B, `CHA` 16 B, `EVE` 32 B), `0x90`-Füllung, der letzte Satz ohne Füllung, danach die Strings. Ein Feld gilt als Zeiger, wenn es in **jedem** Satz auf einen Stringanfang oder auf `0`/`FFFFFFFF` (kein String, z. B. `EVE` ohne Kapitelüberschrift) zeigt. Zeigt ein Feld nur teilweise auf Strings, bricht das Tool ab.
-  - Jeder String muss referenziert sein, sonst Abbruch.
-- Roundtrip identisch für `njBtlText` (51 Strings), `njDBcommon` (48), `SegmentFileData` (88), `MVtext` (280), `njDataText` (443). Zur Kontrolle werden auch `DBC`/`DBC2` korrekt erkannt.
-- `njDBcommon.bin` enthält u. a. die Datenbank-Kategorienamen für **gesperrte** Kategorien → gleich übersetzen wie in `DBC.bin`.
+Blocks contain records with a tag (`DBF\0`, `SEG\0`, `TOP\0`), string offsets relative to the block and numbers.
+- `DBC.bin`/`DBC2.bin`: see [datenbank.md](datenbank.md) (own tool `dbctext.py`).
+- Other files: generic tool **`tools/bintext.py`**. Each block is one of two kinds:
+  - **Table:** u32 offsets (relative to the block), the first offset equals the table length, then the strings. Used by `njBtlText`,
+    `njDBcommon` and the last block of `SegmentFileData`/`MVtext`/`njDataText`.
+  - **Records:** tag (`SEG` 48 B, `MVD` 48 B, `TOP` 32 B, `CHA` 16 B, `EVE` 32 B), `0x90` padding, the last record without padding,
+    then the strings. A field counts as a pointer if in **every** record it points to a string start or is `0`/`FFFFFFFF` (no string,
+    e.g. `EVE` without chapter heading). If a field points to strings only sometimes, the tool aborts.
+  - Every string must be referenced, otherwise the tool aborts.
+- Round trip identical for `njBtlText` (51 strings), `njDBcommon` (48), `SegmentFileData` (88), `MVtext` (280), `njDataText` (443).
+  As a cross-check, `DBC`/`DBC2` are recognised correctly too.
+- `njDBcommon.bin` contains the database category names for **locked** categories → translate them like in `DBC.bin`.
 
-## Minispiel und Episoden-Rückblicke (Tool: `tools/mestext.py`)
+## Minigame and episode recaps (tool: `tools/mestext.py`)
 
-**`\mg1\us\Message.Dat`** (Minispiel):
+**`\mg1\us\Message.Dat`** (minigame):
 ```
-0x0000  933 × u32 Offset (relativ zu 0x2800)
-0x0E94  bis 0x2800 andere Daten (Grafik/Attribute?) – bleiben unverändert
-0x2800  nullterminierte Strings bis Dateiende
+0x0000  933 × u32 offset (relative to 0x2800)
+0x0E94  up to 0x2800 other data (graphics/attributes?) – unchanged
+0x2800  null-terminated strings up to the end of the file
 ```
-Roundtrip identisch. 931 Texte exportiert, 2 japanische Reste ausgelassen. Viele Texte enthalten Tastensymbole (`<○>`, `<□>`, `△`, `×`, `↑`).
+Round trip identical. 931 texts exported, 2 Japanese leftovers skipped. Many texts contain button symbols (`<○>`, `<□>`, `△`, `×`, `↑`).
+Upper-case texts drawn with the minigame's bitmap font (e.g. "PRESS START BUTTON!") only support the glyphs of that font – keep them
+in English unless you check the font.
 
-**`\mnu\pse\us\*.mes`**: Textdateien (CRLF) mit Abschnitten `#MESSAGE n`.
-- **Englisch:** nur `EP1.mes` (29 Abschnitte) und `EP2.mes` (40), vermutlich die Zusammenfassungen von Episode I/II im Bonusmenü.
-- **Nur Japanisch:** `AC.mes`, `PP.mes`, `opening.mes`, `test.mes`. Wahrscheinlich in der US-Fassung ungenutzt; „Pied Piper“ steht englisch in `njDataText.bin`/`synopsis.txd`. Im Spiel prüfen.
-- Exportiert wird pro Abschnitt der Text mit echten Zeilenumbrüchen in der CSV-Zelle. Leerzeilen und Kopf bleiben erhalten. Roundtrip identisch.
+**`\mnu\pse\us\*.mes`**: text files (CRLF) with sections `#MESSAGE n`.
+- **English:** only `EP1.mes` (29 sections) and `EP2.mes` (40) – the Episode I/II summaries in the bonus menu.
+- **Japanese only:** `AC.mes`, `PP.mes`, `opening.mes`, `test.mes` – apparently unused in the US release.
+- Each section is exported as one cell with real line breaks. Blank lines and headers are preserved. Round trip identical.

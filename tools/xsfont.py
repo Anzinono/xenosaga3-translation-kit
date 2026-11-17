@@ -1,15 +1,15 @@
-"""Exportiert den Spiel-Font (mnu/us/font0.bin, font1.bin) als PNG und die Breitentabelle als CSV.
+"""Exports the game font (mnu/us/font0.bin, font1.bin) as PNG and the width table as CSV.
 
-Format (siehe docs/formats/font.md):
-  0x00000-0x77FFF  4 Ebenen à 1024 Glyphen, 20x24 Pixel, 1 Byte pro Pixel;
-                   jede Ebene belegt 2 Bit des Bytes (Ebene n = Bits 2n..2n+1), Graustufe 0-3
-  0x78000-0x783FF  Breitentabelle: 512 x (links, rechts) für Glyphen 0-511 der Ebene 0
-  0x78400-0x78BFF  Zusatzgrafik (wird separat als Textur geladen), noch nicht untersucht
+Format (see docs/formats/font.md):
+  0x00000-0x77FFF  4 planes of 1024 glyphs, 20x24 pixels, 1 byte per pixel;
+                   each plane uses 2 bits of the byte (plane n = bits 2n..2n+1), gray level 0-3
+  0x78000-0x783FF  width table: 512 x (left, right) for glyphs 0-511 of plane 0
+  0x78400-0x78BFF  extra graphic (loaded separately as a texture), not analysed yet
 
-Aufruf:
-  python tools/xsfont.py <font.bin> --out <ordner>
-Erzeugt: ebene0.png .. ebene3.png (32 Glyphen pro Zeile, Glyphnummer = Zeile*32 + Spalte)
-         breiten.csv (glyphe, byte_cp1252, zeichen, links, rechts, breite)
+Usage:
+  python tools/xsfont.py <font.bin> --out <folder>
+Creates: ebene0.png .. ebene3.png (32 glyphs per row, glyph number = row*32 + column)
+         breiten.csv (glyph, cp1252 byte, character, left, right, width)
 """
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def write_png_gray(path: str, w: int, h: int, rows: list[list[int]]) -> None:
 
 
 def glyph_for_byte(b: int) -> int | None:
-    """Glyphnummer für ein Einzelbyte >= 0x80 (Windows-1252), laut FUN_00184b30/FUN_00184938."""
+    """Glyph number for a single byte >= 0x80 (Windows-1252), per FUN_00184b30/FUN_00184938."""
     return b + 0x80 if b >= 0x80 else None
 
 
@@ -51,7 +51,7 @@ def main() -> int:
     args = ap.parse_args()
     data = open(args.font, "rb").read()
     if len(data) != 0x78C00:
-        print(f"Warnung: unerwartete Größe {len(data):#x}", file=sys.stderr)
+        print(f"Warning: unexpected size {len(data):#x}", file=sys.stderr)
     os.makedirs(args.out, exist_ok=True)
     rows_g = PER_PLANE // COLS
     for plane in range(4):
@@ -73,7 +73,7 @@ def main() -> int:
             b = byte_of.get(g)
             ch = bytes([b]).decode("cp1252", "replace") if b is not None else ""
             wr.writerow([g, f"{b:02X}" if b is not None else "", ch, l, r, r - l + 1 if r or l else 0])
-    print(f"Export nach {args.out}: ebene0-3.png, breiten.csv", file=sys.stderr)
+    print(f"Exported to {args.out}: ebene0-3.png, breiten.csv", file=sys.stderr)
     return 0
 
 

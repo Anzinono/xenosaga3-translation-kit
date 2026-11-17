@@ -1,13 +1,13 @@
-"""Untertitel-Import: Gegenstück zu pySkript/subtitle_export.py.
+"""Subtitle import: counterpart of pySkript/subtitle_export.py.
 
-Liest eine CSV im Format des Exporters (datei; nr; zeile; start; ende; text_en; ...; text_de)
-und ersetzt in der Originaldatei in Zeile <zeile> den Text nach dem TAB durch text_de.
-Zeiten, Befehlszeilen, Leerzeilen und Zeilenenden (CRLF/LF) bleiben unverändert.
+Reads a CSV in the exporter's format (datei; nr; zeile; start; ende; text_en; ...; text_<lang>)
+and replaces, in line <zeile> of the original file, the text after the TAB with the translation.
+Times, command lines, blank lines and line endings (CRLF/LF) stay unchanged.
 
-datei ist relativ zu extracted/, z. B. "disc1/evt/us/s000100.txt"
--> Quelle extracted/disc1/files/evt/us/s000100.txt, Ziel <out>/disc1/evt/us/s000100.txt
+datei is relative to extracted/, e.g. "disc1/evt/us/s000100.txt"
+-> source extracted/disc1/files/evt/us/s000100.txt, target <out>/disc1/evt/us/s000100.txt
 
-Aufruf: python tools/subtitle_import.py --csv text/de/untertitel.csv --out build/de/untertitel
+Usage: python tools/subtitle_import.py --csv text/fr/untertitel.csv --out build/fr/untertitel
 """
 from __future__ import annotations
 
@@ -34,12 +34,12 @@ def apply(data: bytes, changes: dict[int, str], label: str, errors: list[str]) -
     for nr, text in changes.items():
         i = nr - 1
         if i >= len(lines) or b"\t" not in lines[i]:
-            errors.append(f"{label} Zeile {nr}: keine Untertitelzeile")
+            errors.append(f"{label} line {nr}: not a subtitle line")
             continue
         time, rest = lines[i].split(b"\t", 1)
         cr = b"\r" if rest.endswith(b"\r") else b""
         try:
-            lines[i] = time + b"\t" + encode_de(text, f"{label} Zeile {nr}") + cr
+            lines[i] = time + b"\t" + encode_de(text, f"{label} line {nr}") + cr
         except SBError as e:
             errors.append(str(e))
     return b"\n".join(lines)
@@ -63,8 +63,8 @@ def main() -> int:
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(new)
     for e in errors:
-        print("FEHLER:", e, file=sys.stderr)
-    print(f"{len(changes)} Untertiteldateien geschrieben, {len(errors)} Fehler.", file=sys.stderr)
+        print("ERROR:", e, file=sys.stderr)
+    print(f"{len(changes)} subtitle files written, {len(errors)} errors.", file=sys.stderr)
     return 1 if errors else 0
 
 

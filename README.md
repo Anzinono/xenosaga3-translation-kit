@@ -10,7 +10,12 @@ database, subtitles and graphics with text) and are tested in PCSX2.
 > The exported game text, your translation and the resulting patches are derived from copyrighted material –
 > keep them private and do not upload them to public repositories.
 
-*Deutsche Kurzfassung weiter unten. The detailed documentation in `docs/` is written in German.*
+*Deutsche Kurzfassung weiter unten.*
+
+**Note on names:** the tools come from a German project. Code, comments, messages and documentation are in English,
+but file names, command-line flags (`--sprache`, `--nur-dateien`, `--ohne-pruefsumme`), CSV column names
+(`datei`, `kategorie`, `eintrag`, …) and JSON keys in the templates (`schrift`, `zeilen`, …) keep their German names,
+because the tables and configurations depend on them. The template files explain their keys in `_hinweis`.
 
 ## What it can do
 
@@ -58,7 +63,7 @@ additional font/encoding work – see `docs/formats/font.md`.
    Result: `build/Xenosaga3_FR_Disc1.iso` / `Disc2.iso`, patches in `patch/`, report in `build/pruefbericht.md`.
 5. Test in PCSX2, fix, rebuild.
 
-## Documentation (German)
+## Documentation
 
 | File | Content |
 |---|---|
@@ -92,4 +97,4 @@ python -I tools/build.py --sprache fr           # Images + Patches bauen
 ```
 
 Exportierte Texte, Übersetzungen und Patches enthalten geschützten Spieltext: nur privat verwenden, nicht öffentlich hochladen.
-Ausführliche Doku in `docs/`.
+Ausführliche Doku (englisch) in `docs/`.

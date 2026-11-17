@@ -1,5 +1,5 @@
 {
-  "_hinweis": "Titelbildschirm (tools/titelbild.py): Menüwörter in Großbuchstaben übersetzen; credit = optionale Zeile über der Copyright-Zeile, z. B. 'Traduction : <Name>'. Leer = Original bleibt.",
+  "_hinweis": "Title screen (tools/titelbild.py): translate the menu words in 'menue' (upper case recommended); credit = optional line above the copyright line, e.g. 'Traduction : <name>'. Empty = original stays. Keys stay as they are (schrift = font, fett = bold, hoehe = height in px, position 'ueber' = above / 'unter' = below).",
   "menue": {
     "NEW GAME": "",
     "CONTINUE": "",

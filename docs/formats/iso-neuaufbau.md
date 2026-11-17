@@ -1,45 +1,53 @@
-# ISO-Neuaufbau (Dateien dürfen wachsen)
+# ISO rebuild (files may grow)
 
-Tools: `tools/x3rebuild.py` (bauen), `tools/verify_rebuild.py` (prüfen).
+Tools: `tools/x3rebuild.py` (build), `tools/verify_rebuild.py` (verify).
 
-## Wie das Spiel die Archive liest
+## How the game reads the archives
 
-`FUN_00188148` (SLUS_213.89) sucht einen Pfad in den drei geladenen Katalogen (`x3.00`, `x3.10`, `x3.20`, Deskriptoren bei `0x89B5E0/0x89B600/0x89B640`). Lesestart ist **Basis der Kette + Sektor aus dem Katalog**. Die Basis ist die LBA des Katalogs, über das Dateisystem gefunden (`\X3.00;1`).
-→ Katalog und Datenteile (`X3.00`, `X3.01`, `X3.02` …) müssen **lückenlos hintereinander** auf der Disc liegen. Die Aufteilung in 1-GiB-Dateien ist nur eine Grenze des Dateisystems.
+`FUN_00188148` (SLUS_213.89) looks up a path in the three loaded catalogs (`x3.00`, `x3.10`, `x3.20`, descriptors at
+`0x89B5E0/0x89B600/0x89B640`). Reading starts at **chain base + sector from the catalog**. The base is the LBA of the catalog,
+found via the file system (`\X3.00;1`).
+→ The catalog and its data parts (`X3.00`, `X3.01`, `X3.02` …) must lie **contiguously** on the disc. The split into 1 GiB files
+is only a file-system limit.
 
-## Physischer Aufbau Disc 1 (Original)
+## Physical layout of disc 1 (original)
 
-| LBA | Inhalt |
+| LBA | Content |
 |---|---|
-| 16–20 | ISO-9660-PVD, Terminator, UDF-Erkennung (`BEA01`, `NSR02`, `TEA01`) |
-| 32–37, 48–53 | UDF-Volume-Deskriptoren (Haupt- und Reservekopie) |
+| 16–20 | ISO 9660 PVD, terminator, UDF recognition (`BEA01`, `NSR02`, `TEA01`) |
+| 32–37, 48–53 | UDF volume descriptors (main and reserve copy) |
 | 64 | UDF Logical Volume Integrity Descriptor |
-| 256 | UDF-Anker |
-| 257–262 | ISO-Pfadtabellen und Verzeichnisse (Root 261, IOP 262) |
-| 263–290 | UDF-Partition beginnt (263), Dateieinträge 267–290 |
-| 291–3113 | SYSTEM.CNF, SLUS, OVLs, IOP-Module |
-| 3114–807413 | **Kette 1:** X3.00 (55) + X3.01 + X3.02 |
-| 807414–1905668 | **Kette 2:** X3.10 (26) + X3.11 + X3.12 + X3.13 |
-| 1905669–1915918 | 10 251 leere Füllsektoren |
-| 1915919 | UDF-Anker (Ende) |
+| 256 | UDF anchor |
+| 257–262 | ISO path tables and directories (root 261, IOP 262) |
+| 263–290 | UDF partition start (263), file entries 267–290 |
+| 291–3113 | SYSTEM.CNF, SLUS, OVLs, IOP modules |
+| 3114–807413 | **chain 1:** X3.00 (55) + X3.01 + X3.02 |
+| 807414–1905668 | **chain 2:** X3.10 (26) + X3.11 + X3.12 + X3.13 |
+| 1905669–1915918 | 10 251 empty padding sectors |
+| 1915919 | UDF anchor (end) |
 
-## Verfahren
+## Procedure
 
-1. Ersatzdatei passt in ihren alten Sektorplatz → wird dort geschrieben.
-2. Sonst → ans Ende ihrer Kette gehängt (hinter `X3.02` bzw. `X3.13`/`X3.23`). Der letzte Datenteil wird größer, alle späteren Sektoren rücken nach hinten.
-3. Angepasst werden:
-   - Katalog: Sektor (u24) und Größe.
-   - ISO 9660: Lage und Größe in den Verzeichniseinträgen (LE und BE), Volume-Größe im PVD.
-   - UDF: Dateieinträge (Allocation Descriptor, Informationslänge, belegte Blöcke), Partitionslänge (Haupt- und Reservekopie), Größentabelle im LVID, Ortsangabe des End-Ankers, jeweils mit neu berechneter Tag-Prüfsumme und CRC-CCITT.
+1. A replacement file that fits its old sector slot is written in place.
+2. Otherwise it is appended to the end of its chain (after `X3.02` or `X3.13`/`X3.23`). The last data part grows and all later
+   sectors move back.
+3. Updated:
+   - catalog: sector (u24) and size;
+   - ISO 9660: location and size in the directory records (LE and BE), volume size in the PVD;
+   - UDF: file entries (allocation descriptor, information length, recorded blocks), partition length (main and reserve copy),
+     size table in the LVID, location of the end anchor – each with recomputed tag checksum and CRC-CCITT.
 
-## Prüfungen
+## Verification
 
-- **Neuaufbau ohne Änderungen → byte-identisch zum Original.** Das bestätigt auch die UDF-CRC-Berechnung.
-- `verify_rebuild.py`: ISO-9660 und UDF stimmen für jede Datei überein; Volume-Größe, Partition und End-Anker passen. Alle Dateien außerhalb der Archive sind unverändert. **Jede** Archivdatei (13 516 auf Disc 1) entspricht der Ersatzdatei bzw. dem Original.
-- Testpatch 2: 20 Dateien verschoben, darunter `DBC.bin` mit +24 %. Es wurden 831 Sektoren eingefügt, die Prüfung ergab 0 Fehler.
+- **Rebuilding without changes → byte-identical to the original.** This also confirms the UDF CRC calculation.
+- `verify_rebuild.py`: ISO 9660 and UDF agree for every file; volume size, partition and end anchor match. All files outside the
+  archives are unchanged. **Every** archive file (13 516 on disc 1) matches its replacement or the original.
+- Tested in PCSX2 with 20 moved files incl. `DBC.bin` +24 % (831 sectors inserted): the game finds the moved chain 2 and loads the
+  larger database.
 
-## Hinweise
+## Notes
 
-- Disc 2 hat dieselbe Struktur (`X3.20`–`X3.23`). Das gemeinsame Archiv `X3.00`–`X3.02` muss auf beiden Discs gleich gepatcht werden.
-- Größe: Disc 2 ist 4,516 GB groß, eine einschichtige DVD fasst 4,700 GB → rund 184 MB Reserve. Textänderungen brauchen nur wenige MB.
-- Noch nicht im Spiel getestet: eine Datei, die innerhalb von **Kette 2** (Untertitel) ans Ende verschoben wird. Verfahren und Code sind identisch zu Kette 1.
+- Disc 2 has the same structure (`X3.20`–`X3.23`). The shared archive `X3.00`–`X3.02` must be patched identically on both discs –
+  `tools/build.py` does this.
+- Size: disc 2 is 4.516 GB, a single-layer DVD holds 4.700 GB → about 184 MB reserve. Text changes only need a few MB.
+- Not yet tested in the game: a file moved to the end **within chain 2** (subtitles). Procedure and code are the same as for chain 1.

@@ -1,8 +1,8 @@
 @echo off
-rem Startet Ghidra headless mit eigenem Einstellungsordner.
-rem Grund: Die Claude-Desktop-App virtualisiert %APPDATA%; Ghidras OSGi-Framework
-rem (Felix) bricht dann mit "The data file must be inside the data dir" ab.
-rem Aufruf: tools\ghidra-headless.bat <Projektordner> <Projektname> [weitere analyzeHeadless-Argumente]
+rem Runs Ghidra headless with its own settings folder.
+rem Reason: the Claude desktop app virtualises %APPDATA%; Ghidra's OSGi framework
+rem (Felix) then aborts with "The data file must be inside the data dir".
+rem Usage: tools\ghidra-headless.bat <project folder> <project name> [further analyzeHeadless arguments]
 setlocal
 if not defined GHIDRA_INSTALL_DIR set "GHIDRA_INSTALL_DIR=C:\tools\ghidra_12.2_PUBLIC"
 if not defined JAVA_HOME set "JAVA_HOME=C:\Program Files\Java\jdk-25"

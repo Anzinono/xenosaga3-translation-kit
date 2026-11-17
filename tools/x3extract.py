@@ -1,14 +1,14 @@
-"""Extrahiert Dateien aus den X3-Archiven direkt aus dem Disc-Image (ISO).
+"""Extracts files from the X3 archives directly from the disc image (ISO).
 
-Liest das ISO-9660-Wurzelverzeichnis, findet Katalog (X3.00/X3.10/X3.20) und
-Datenteile (X3.01, X3.02, ...) und kopiert die gewünschten Dateien heraus.
-Das ISO wird nur gelesen, nie verändert.
+Reads the ISO 9660 root directory, finds the catalog (X3.00/X3.10/X3.20) and the
+data parts (X3.01, X3.02, ...) and copies the requested files out.
+The ISO is only read, never changed.
 
-Aufruf:
+Usage:
   python tools/x3extract.py <image.iso> --out extracted/disc1/files [--filter "\\cf\\us\\*"] [--list]
 
---filter ist ein Muster wie bei Dateinamen (fnmatch, Groß/Klein egal), mehrfach möglich.
-Ohne --filter wird alles extrahiert (mehrere GB!).
+--filter is a file-name pattern (fnmatch, case-insensitive), can be given several times.
+Without --filter everything is extracted (several GB!).
 """
 from __future__ import annotations
 
@@ -25,11 +25,11 @@ SECTOR = 2048
 
 
 def iso_root_files(fh) -> dict[str, tuple[int, int]]:
-    """Dateiname -> (Byte-Offset im ISO, Größe) für das Wurzelverzeichnis."""
+    """File name -> (byte offset in the ISO, size) for the root directory."""
     fh.seek(16 * SECTOR)
     pvd = fh.read(SECTOR)
     if pvd[1:6] != b"CD001":
-        raise SystemExit("Kein ISO-9660-Image")
+        raise SystemExit("Not an ISO 9660 image")
     root = pvd[156:190]
     (lba,) = struct.unpack_from("<I", root, 2)
     (size,) = struct.unpack_from("<I", root, 10)
@@ -39,7 +39,7 @@ def iso_root_files(fh) -> dict[str, tuple[int, int]]:
     pos = 0
     while pos < len(data):
         rl = data[pos]
-        if rl == 0:  # Rest des Sektors ist leer
+        if rl == 0:  # rest of the sector is empty
             pos = (pos // SECTOR + 1) * SECTOR
             continue
         (flba,) = struct.unpack_from("<I", data, pos + 2)
@@ -52,7 +52,7 @@ def iso_root_files(fh) -> dict[str, tuple[int, int]]:
 
 
 class Chain:
-    """Mehrere ISO-Dateien (X3.x1, X3.x2, ...) als ein zusammenhängender Adressraum."""
+    """Several ISO files (X3.x1, X3.x2, ...) as one contiguous address space."""
 
     def __init__(self, fh, parts: list[tuple[int, int]]):
         self.fh = fh
@@ -71,7 +71,7 @@ class Chain:
                 length -= n
             base += size
         if length:
-            raise ValueError("Lesen über das Ende der Kette hinaus")
+            raise ValueError("Read beyond the end of the chain")
         return bytes(out)
 
 
@@ -80,7 +80,7 @@ def main() -> int:
     ap.add_argument("iso")
     ap.add_argument("--out", required=True)
     ap.add_argument("--filter", action="append", default=[])
-    ap.add_argument("--list", action="store_true", help="nur auflisten, nichts schreiben")
+    ap.add_argument("--list", action="store_true", help="only list, write nothing")
     args = ap.parse_args()
     pats = [p.lower() for p in args.filter]
     total = count = 0
@@ -107,7 +107,7 @@ def main() -> int:
                 os.makedirs(os.path.dirname(dest), exist_ok=True)
                 with open(dest, "wb") as out:
                     out.write(chain.read(e.offset, e.size))
-    print(f"{count} Dateien, {total / 2**20:.1f} MiB{' (nur Liste)' if args.list else ''}", file=sys.stderr)
+    print(f"{count} files, {total / 2**20:.1f} MiB{' (list only)' if args.list else ''}", file=sys.stderr)
     return 0
 
 

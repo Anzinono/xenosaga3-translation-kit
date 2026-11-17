@@ -1,6 +1,6 @@
-# Rendert einen Text mit Windows-Schrift (GDI+) als Graustufen-Maske (weiß auf schwarz) in eine BMP-Datei.
-# Aufruf: powershell -NoProfile -File tools\render_text.ps1 -Text "NEUES SPIEL" -Font "Arial Narrow" -Size 17 -Out maske.bmp [-Bold]
-# Die Größe ist in Pixeln (Em-Höhe). Das Bild wird auf den Text zugeschnitten (Rand 2 px).
+# Renders text with a Windows font (GDI+) as a grayscale mask (white on black) into a BMP file.
+# Usage: powershell -NoProfile -File tools\render_text.ps1 -Text "NEW GAME" -Font "Arial Narrow" -Size 17 -Out mask.bmp [-Bold]
+# Size is in pixels (em height). The image is cropped to the text (2 px margin).
 param(
     [Parameter(Mandatory = $true)][string]$Text,
     [string]$Font = "Arial",
@@ -11,7 +11,7 @@ param(
 Add-Type -AssemblyName System.Drawing
 $style = if ($Bold) { [System.Drawing.FontStyle]::Bold } else { [System.Drawing.FontStyle]::Regular }
 $f = New-Object System.Drawing.Font($Font, $Size, $style, [System.Drawing.GraphicsUnit]::Pixel)
-if ($f.Name -ne $Font) { throw "Schrift '$Font' nicht gefunden (Ersatz: $($f.Name))" }
+if ($f.Name -ne $Font) { throw "Font '$Font' not found (substitute: $($f.Name))" }
 $tmp = New-Object System.Drawing.Bitmap(1, 1)
 $g = [System.Drawing.Graphics]::FromImage($tmp)
 $fmt = [System.Drawing.StringFormat]::GenericTypographic

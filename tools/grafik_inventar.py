@@ -1,12 +1,12 @@
-"""Bestandsaufnahme aller Spielgrafiken: exportiert sie als PNG/JPG und baut eine Übersichtsseite.
+"""Inventory of all game graphics: exports them as PNG/JPG and builds an overview page.
 
-Quelle: extracted/disc1/files (vorher mit x3extract.py entpacken, siehe docs/grafik.md)
-Ziel:   build/grafik/inventar/ (index.html + Bilder + inventar.csv); Spieldaten, nicht ins Git.
+Source: extracted/disc1/files (extract with x3extract.py first, see docs/grafik.md)
+Target: build/grafik/inventar/ (index.html + images + inventar.csv); game data, not for Git.
 
-Unterstützt: .png/.jpg/.bmp (Kopie), .xtx (Format 0x08), .tm2, Effekt-Container .esd/.esp
-(eingebettete Texturen), .bin mit eingebetteten JPGs (credit.bin, diskchg.bin).
+Supported: .png/.jpg/.bmp (copied), .xtx (format 0x08), .tm2, effect containers .esd/.esp
+(embedded textures), .bin with embedded JPGs (credit.bin, diskchg.bin).
 
-Aufruf:  python -I tools/grafik_inventar.py [--src extracted/disc1/files] [--out build/grafik/inventar]
+Usage:  python -I tools/grafik_inventar.py [--src extracted/disc1/files] [--out build/grafik/inventar]
 """
 from __future__ import annotations
 
@@ -25,21 +25,21 @@ from xtx import clut_at, find_cluts, parse as xtx_parse, unswizzle8, write_png  
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Gruppen in der Übersicht: (Titel, Muster relativ zur Quelle, Beschreibung)
+# groups in the overview: (title, patterns relative to the source, description)
 GROUPS = [
-    ("Menü (sprachabhängig)", ["mnu/us/*.png", "mnu/us/*.xtx", "mnu/us/*.jpg"], "Titel, Fenster, Synopsis, Game Over"),
-    ("Menü (allgemein)", ["mnu/*.png", "mnu/*.xtx", "mnu/*.bin"], "Steuerung, Item-/Segment-Bilder, Abspann, Disc-Wechsel"),
-    ("Rückblick-Logos", ["mnu/pse/us/*.tm2", "mnu/pse/*.tm2", "mnu/pse/*.jpg"], "Episode I/II, Hintergrund"),
-    ("Rückblick Episode I", ["mnu/pse/EP1/*.jpg"], ""),
-    ("Rückblick Episode II", ["mnu/pse/EP2/*.jpg"], ""),
+    ("Menu (language-specific)", ["mnu/us/*.png", "mnu/us/*.xtx", "mnu/us/*.jpg"], "title, windows, synopsis, Game Over"),
+    ("Menu (general)", ["mnu/*.png", "mnu/*.xtx", "mnu/*.bin"], "controls, item/segment images, credits, disc change"),
+    ("Recap logos", ["mnu/pse/us/*.tm2", "mnu/pse/*.tm2", "mnu/pse/*.jpg"], "Episode I/II, background"),
+    ("Recap Episode I", ["mnu/pse/EP1/*.jpg"], ""),
+    ("Recap Episode II", ["mnu/pse/EP2/*.jpg"], ""),
     ("Synopsis", ["mnu/syno/*.jpg"], ""),
-    ("Zwischenbilder", ["mnu/intm/*.jpg", "mnu/umn/*.jpg"], ""),
-    ("Minispiel", ["mg1/us/*.xtx"], "HaKox"),
+    ("Interstitial images", ["mnu/intm/*.jpg", "mnu/umn/*.jpg"], ""),
+    ("Minigame", ["mg1/us/*.xtx"], "HaKox"),
     ("Film", ["mov/us/*.png"], ""),
-    ("Ortseinblendungen (Effekte)", ["ef/esd/us/*.esd", "ef/map/us/*.esp", "ef/esp/us/*.esp"], "Texturen in Effekt-Containern"),
-    ("Kampf-Porträts", ["bat/bat_face/*.jpg"], ""),
-    ("Datenbankbilder", ["jpg/us/*.jpg"], "dtimg_*"),
-    ("Weitere Bilder", ["jpg/*.jpg"], "mcimg_*"),
+    ("Location titles (effects)", ["ef/esd/us/*.esd", "ef/map/us/*.esp", "ef/esp/us/*.esp"], "textures in effect containers"),
+    ("Battle portraits", ["bat/bat_face/*.jpg"], ""),
+    ("Database images", ["jpg/us/*.jpg"], "dtimg_*"),
+    ("Other images", ["jpg/*.jpg"], "mcimg_*"),
 ]
 
 
@@ -52,22 +52,22 @@ def export_xtx(src: Path, dst: Path) -> list[tuple[Path, str]]:
     ow, oh = w * 2, h * 2
     try:
         idx = unswizzle8(canvas, w, ow, oh)
-    except IndexError:                        # Breite passt nicht zum Swizzle -> als lineares RGBA zeigen
+    except IndexError:                        # width does not fit the swizzle -> show as linear RGBA
         rows = [bytes(v if i % 4 != 3 else min(v * 2, 255) for i, v in enumerate(canvas[y * w * 4:(y + 1) * w * 4]))
                 for y in range(h)]
         write_png(dst.with_suffix(".png"), w, h, rows, rgba=True)
-        return [(dst.with_suffix(".png"), f"{w}×{h}, als lineares RGBA gelesen (Swizzle passt nicht)")]
+        return [(dst.with_suffix(".png"), f"{w}×{h}, read as linear RGBA (swizzle does not fit)")]
     cands = find_cluts(canvas, w, h)
     if cands:
         pal = clut_at(canvas, w, *cands[0])
         rows = [b"".join(bytes(pal[i]) for i in idx[y * ow:(y + 1) * ow]) for y in range(oh)]
         write_png(dst.with_suffix(".png"), ow, oh, rows, rgba=True)
-        note = f"{ow}×{oh}, 8 Bit, Palette {cands[0]}"
+        note = f"{ow}×{oh}, 8 bit, palette {cands[0]}"
     else:
         mx = max(idx) or 1
         rows = [bytes(min(255, v * 255 // mx) for v in idx[y * ow:(y + 1) * ow]) for y in range(oh)]
         write_png(dst.with_suffix(".png"), ow, oh, rows)
-        note = f"{ow}×{oh}, 8 Bit, Indexbild (Graustufen, Palette nicht gefunden)"
+        note = f"{ow}×{oh}, 8 bit, index image (grayscale, palette not found)"
     return [(dst.with_suffix(".png"), note)]
 
 
@@ -77,7 +77,7 @@ def export_tm2(src: Path, dst: Path) -> list[tuple[Path, str]]:
     for n, pic in enumerate(tm2.parse(data)):
         p = dst.with_name(f"{dst.stem}{'_' + str(n) if n else ''}.png")
         write_png(p, pic.w, pic.h, tm2.to_rgba(data, pic), rgba=True)
-        res.append((p, f"{pic.w}×{pic.h}, Typ {pic.img_type}"))
+        res.append((p, f"{pic.w}×{pic.h}, type {pic.img_type}"))
     return res
 
 
@@ -85,8 +85,8 @@ EF_SEEN: dict[bytes, Path] = {}
 
 
 def export_ef(src: Path, dst: Path) -> list[tuple[Path, str]]:
-    """Texte stecken in den Deckkraftmasken '<name>-a.bmp' (Farbe kommt aus dem Bild davor, z. B. moji.bmp).
-    Gezeigt wird die Maske als Graustufen (weiß = deckend); gleiche Masken nur einmal."""
+    """Text sits in the opacity masks '<name>-a.bmp' (colour comes from the image before it, e.g. moji.bmp).
+    The mask is shown as grayscale (white = opaque); identical masks only once."""
     data = src.read_bytes()
     res = []
     for n, r in enumerate(eftex.textures(data)):
@@ -100,7 +100,7 @@ def export_ef(src: Path, dst: Path) -> list[tuple[Path, str]]:
         EF_SEEN[idx] = p
         mx = (1 << r.bpp) - 1
         write_png(p, r.w, r.h, [bytes(v * 255 // mx for v in idx[y * r.w:(y + 1) * r.w]) for y in range(r.h)])
-        res.append((p, f"Maske {r.name} {r.w}×{r.h}, {r.bpp} Bit, @{r.off:#x}"))
+        res.append((p, f"mask {r.name} {r.w}×{r.h}, {r.bpp} bit, @{r.off:#x}"))
     return res
 
 
@@ -154,8 +154,8 @@ def img_size(p: Path) -> str:
     return ""
 
 
-PAGE = """<!doctype html><html lang="de"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>Grafik-Inventar</title>
+PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Graphics inventory</title>
 <style>
 :root{{--bg:#1b1d22;--card:#262a31;--fg:#e8e8e8;--mut:#9aa0a8;--acc:#6cc3ff}}
 body{{background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,sans-serif;margin:0;padding:16px}}
@@ -165,12 +165,12 @@ nav a{{color:var(--acc);margin-right:12px;white-space:nowrap}}
 .c{{background:var(--card);border-radius:6px;padding:6px;overflow:hidden}}
 .c img{{max-width:100%;display:block;margin:auto;background:repeating-conic-gradient(#333 0 25%,#3c3c3c 0 50%) 0 0/16px 16px;image-rendering:pixelated}}
 .c div{{font-size:12px;color:var(--mut);word-break:break-all}} .c b{{color:var(--fg);font-weight:600}}
-</style></head><body><h1>Grafik-Inventar Xenosaga III (Disc 1)</h1>
-<p>{total} Bilder. Klick auf ein Bild öffnet es in Originalgröße.</p><nav>{nav}</nav>{body}</body></html>"""
+</style></head><body><h1>Graphics inventory Xenosaga III (disc 1)</h1>
+<p>{total} images. Click an image to open it at full size.</p><nav>{nav}</nav>{body}</body></html>"""
 
 
-# Kontaktbogen: kontakt.html?pfad=jpg/us/&von=0&n=100&w=160 (kleine Vorschaubilder einer Gruppe)
-KONTAKT = r"""<!doctype html><meta charset="utf-8"><title>Kontaktbogen</title>
+# contact sheet: kontakt.html?pfad=jpg/us/&von=0&n=100&w=160 (small thumbnails of one group)
+KONTAKT = r"""<!doctype html><meta charset="utf-8"><title>Contact sheet</title>
 <style>body{background:#000;margin:0;display:flex;flex-wrap:wrap;gap:2px;font:11px sans-serif}
 figure{margin:0;position:relative}img{width:var(--w,160px);display:block}
 figcaption{position:absolute;left:0;top:0;background:#000c;color:#ff0;padding:0 3px}</style>
@@ -191,7 +191,7 @@ def main() -> int:
     args = ap.parse_args()
     src, out = Path(args.src), Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    for old in out.iterdir():                 # Inhalt leeren (Ordner selbst kann offen sein)
+    for old in out.iterdir():                 # empty the contents (the folder itself may be open)
         if old.is_dir():
             shutil.rmtree(old)
         else:
@@ -210,7 +210,7 @@ def main() -> int:
         if not items:
             continue
         total += len(items)
-        big = gi < 3 or "Ortseinblendungen" in title or "Minispiel" in title or "Film" in title
+        big = gi < 3 or "Location titles" in title or "Minigame" in title or "Film" in title
         nav.append(f'<a href="#g{gi}">{html.escape(title)} ({len(items)})</a>')
         cards = []
         for rel, p, note in items:
@@ -228,7 +228,7 @@ def main() -> int:
         w = csv.DictWriter(fh, fieldnames=list(rows[0]), delimiter=";")
         w.writeheader()
         w.writerows(rows)
-    print(f"{total} Bilder -> {out / 'index.html'}", file=sys.stderr)
+    print(f"{total} images -> {out / 'index.html'}", file=sys.stderr)
     return 0
 
 

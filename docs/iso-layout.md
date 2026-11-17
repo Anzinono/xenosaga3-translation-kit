@@ -1,38 +1,41 @@
-# ISO-Layout (US, SLUS-213.89 / SLUS-214.17)
+# ISO layout (USA, SLUS-213.89 / SLUS-214.17)
 
-## Wurzelverzeichnis
+## Root directory
 
-| Datei | Disc 1 | Disc 2 | Bemerkung |
+| File | Disc 1 | Disc 2 | Note |
 |---|---|---|---|
-| `SYSTEM.CNF` | ✓ | ✓ | Bootet `SLUS_213.89` bzw. `SLUS_214.17`, NTSC, VER 1.00 |
-| `SLUS_213.89` / `SLUS_214.17` | 4 513 232 B | 4 513 232 B | Hauptprogramm, **byte-identisch** auf beiden Discs |
-| `OV01.OVL`, `OV02.OVL`, `OV04.OVL` | ✓ | ✓ | Code-Overlays, identisch |
-| `X3.00` + `X3.01`, `X3.02` | ✓ | ✓ | gemeinsames Archiv, identisch |
-| `X3.10` + `X3.11`–`X3.13` | ✓ | – | Disc-1-Archiv |
-| `X3.20` + `X3.21`–`X3.23` | – | ✓ | Disc-2-Archiv |
-| `IOP\*.IRX`, `IOPRP300.IMG` | ✓ | ✓ | IOP-Module (CRI ADX, Sound, Memory Card, Pad) |
+| `SYSTEM.CNF` | ✓ | ✓ | boots `SLUS_213.89` / `SLUS_214.17`, NTSC, VER 1.00 |
+| `SLUS_213.89` / `SLUS_214.17` | 4 513 232 B | 4 513 232 B | main executable, **byte-identical** on both discs |
+| `OV01.OVL`, `OV02.OVL`, `OV04.OVL` | ✓ | ✓ | code overlays, identical |
+| `X3.00` + `X3.01`, `X3.02` | ✓ | ✓ | shared archive, identical |
+| `X3.10` + `X3.11`–`X3.13` | ✓ | – | disc 1 archive |
+| `X3.20` + `X3.21`–`X3.23` | – | ✓ | disc 2 archive |
+| `IOP\*.IRX`, `IOPRP300.IMG` | ✓ | ✓ | IOP modules (CRI ADX, sound, memory card, pad) |
 
-Archivformat: [formats/x3-archiv.md](formats/x3-archiv.md).
+Archive format: [formats/x3-archiv.md](formats/x3-archiv.md).
 
-## Inhalt der Archive (Auszug, nach Größe)
+## Archive contents (excerpt, by size)
 
-**X3.00 (beide Discs), 9 867 Dateien:** `snd\adx` (Musik/Stimmen, 441 MiB), `mdl\map` (Karten), `mdl\chr` (Figuren), `pac\bat` (Kampf), `ef\*` (Effekte), `kao` (Gesichter, `.xtx`), `jpg` (Datenbankbilder), `mnu\*` (Menüs), `cf\us` (Skripte), `bat\us` (Kampfdialoge), `mg1` (Minispiel).
+**X3.00 (both discs), 9 867 files:** `snd\adx` (music/voices, 441 MiB), `mdl\map` (maps), `mdl\chr` (characters), `pac\bat` (battle),
+`ef\*` (effects), `kao` (faces, `.xtx`), `jpg` (database images), `mnu\*` (menus), `cf\us` (scripts), `bat\us` (battle dialogue), `mg1` (minigame).
 
-**X3.10 (Disc 1), 3 649 Dateien / X3.20 (Disc 2), 1 709 Dateien:** `mov` (`.sfd`-Filme, 1,6 bzw. 2,4 GiB), `evt` (Echtzeit-Zwischensequenzen `.xep`/`.xev`), `snd\adx` (Sprachausgabe), `evt\us` und `mov\us` (Untertitel).
+**X3.10 (disc 1), 3 649 files / X3.20 (disc 2), 1 709 files:** `mov` (`.sfd` movies, 1.6 / 2.4 GiB), `evt` (real-time cutscenes
+`.xep`/`.xev`), `snd\adx` (voice), `evt\us` and `mov\us` (subtitles).
 
-## Übersetzungsrelevante Dateien (Disc 1 geprüft)
+## Files relevant for translation
 
-| Pfad | Anzahl | Format (erster Eindruck) |
+| Path | Count | Format |
 |---|---|---|
-| `\cf\us\*.sb` | 647 | Kompiliertes Skript, Header `SB  `, 6 Abschnitte. Dialoge als ASCII im Datenabschnitt, Tags: `[Shion]` Sprecher, `<f>` Textbox-Ende, `\n` Zeilenumbruch, `<…>` Tasten/Namen |
-| `\bat\us\*.sb` | 69 | wie oben, Kampfdialoge (`MIK_B01.sb` …) |
-| `\evt\us\*.txt`, `\mov\us\*.txt` | 36 + 111 (Disc 1) | **Klartext-Untertitel** mit Zeitstempeln und Steuerbefehlen (`$col…`, `$ruby…`) |
-| `\mnu\us\menutext.txd` | 1 | Zeigertabelle (907 Einträge) + ASCII-Strings, `printf`-Platzhalter (`%s`, `%d`) |
-| `\mnu\us\DBC.bin`, `DBC2.bin` | 2 | Datenbank (Einträge mit langen Texten, `<Name>`-Verweise) |
-| `\mnu\us\njDataText.bin`, `njBtlText.bin`, `njDBcommon.bin`, `MVtext.bin`, `SegmentFileData.bin` | 5 | Menü-/Kampf-/Bonustexte |
-| `\mnu\us\synopsis.txd`, `devchk.txd`, `discchg.txd` | 3 | Zusammenfassungen, Systemmeldungen |
-| `\mnu\us\font0.bin`, `font1.bin` | 2 | je 494 592 B, Rohbitmap ohne Header → Phase 2 |
-| `\mnu\pse\*.mes` | 6 | Texte der Episoden-Rückblicke |
-| `\mnu\us\*.xtx`, `title1.png`, `syno.png` | – | Grafiken mit Text (Titel, Fenster) |
+| `\cf\us\*.sb` | 647 | compiled script, header `SB  `, 6 sections; dialogue as text in the string table, tags `[Speaker]`, `<f>`, `\n` … ([sb.md](formats/sb.md)) |
+| `\bat\us\*.sb` | 69 | same, battle dialogue |
+| `\bat\us\batdat.bin` | 1 | battle data: items, ether, equipment … ([batdat.md](formats/batdat.md)) |
+| `\evt\us\*.txt`, `\mov\us\*.txt` | 36 + 111 (disc 1) | **plain-text subtitles** with timestamps ([untertitel.md](formats/untertitel.md)) |
+| `\mnu\us\menutext.txd` and other `.txd` | 4 | pointer table + strings, `printf` placeholders (`%s`, `%d`) ([menue.md](formats/menue.md)) |
+| `\mnu\us\DBC.bin`, `DBC2.bin` | 2 | database ([datenbank.md](formats/datenbank.md)) |
+| `\mnu\us\njDataText.bin`, `njBtlText.bin`, `njDBcommon.bin`, `MVtext.bin`, `SegmentFileData.bin` | 5 | menu/battle/bonus text |
+| `\mg1\us\Message.Dat`, `\mnu\pse\us\EP1.mes`, `EP2.mes` | 3 | minigame and episode recaps |
+| `\mnu\us\font0.bin`, `font1.bin` | 2 | game font ([font.md](formats/font.md)) |
+| `\mnu\us\*.xtx`, `title1.png`, `ef\esd\*`, `jpg\us\*`, `mnu\intm\*` | – | graphics with text ([grafik.md](grafik.md)) |
 
-Texte sind ASCII. Für Umlaute braucht es eigene Zeichen im Font und eine angepasste Zeichentabelle (Phase 2/5).
+Text is single-byte Windows-1252; the font already contains the Latin-1 glyphs (é, ñ, ö, ß …), so Western European
+languages need no font changes.

@@ -1,14 +1,14 @@
-"""Texte aus .txd-Tabellen (mnu/us/*.txd) exportieren und wieder einsetzen.
+"""Export and re-insert text from .txd tables (mnu/us/*.txd).
 
-Zwei Varianten (siehe docs/formats/menue.md):
-  A  menutext.txd:   u32 Anzahl, Anzahl x u32 absoluter Offset, Strings
-  B  devchk/discchg/synopsis.txd: Anzahl x u32 absoluter Offset (erster Offset = Tabellenlänge), Strings
-Strings sind nullterminiert, Windows-1252. Gleiche Offsets (mehrfach genutzte Strings) bleiben gleich.
+Two variants (see docs/formats/menue.md):
+  A  menutext.txd:   u32 count, count x u32 absolute offset, strings
+  B  devchk/discchg/synopsis.txd: count x u32 absolute offset (first offset = table length), strings
+Strings are null-terminated, Windows-1252. Shared offsets (strings used several times) stay shared.
 
-Befehle:
-  export  python tools/txdtext.py export <datei.txd> [...] --out text/en/menue_txd.csv
-  import  python tools/txdtext.py import <datei.txd> [...] --csv übersetzt.csv --out <zielordner>
-  test    python tools/txdtext.py test <datei.txd> [...]
+Commands:
+  export  python tools/txdtext.py export <file.txd> [...] --out text/en/menue_txd.csv
+  import  python tools/txdtext.py import <file.txd> [...] --csv translated.csv --out <target folder>
+  test    python tools/txdtext.py test <file.txd> [...]
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from sbtext import ENCODING, SBError, decode_game, encode_de  # noqa: E402
 
 
 def parse(data: bytes) -> tuple[str, list[int], bytes]:
-    """-> (Variante, Offsets, Daten)"""
+    """-> (variant, offsets, data)"""
     first = struct.unpack_from("<I", data, 0)[0]
     if first % 4 == 0 and 4 <= first < len(data):
         n = first // 4
@@ -45,7 +45,7 @@ def strings_of(data: bytes, offs: list[int]) -> list[bytes]:
 def build(variant: str, offs: list[int], data: bytes, strings: list[bytes]) -> bytes:
     n = len(offs)
     head = 4 + 4 * n if variant == "A" else 4 * n
-    # Ein Offset kann mehrfach vorkommen: dann wird der String nur einmal geschrieben
+    # An offset may occur several times: the string is then written only once
     order: dict[int, int] = {}
     blob = bytearray()
     new_offs = []
@@ -57,7 +57,7 @@ def build(variant: str, offs: list[int], data: bytes, strings: list[bytes]) -> b
         new_offs.append(order[key])
     table = (struct.pack("<I", n) if variant == "A" else b"") + struct.pack(f"<{n}I", *new_offs)
     out = table + bytes(blob)
-    # Originale Endauffüllung übernehmen (Bytes nach dem letzten String)
+    # keep the original trailing padding (bytes after the last string)
     last_end = max(data.index(b"\0", o) + 1 for o in offs)
     return out + data[last_end:]
 
@@ -75,7 +75,7 @@ def cmd_export(args) -> int:
                 t = decode_game(s)
                 cat = "befehl" if t.startswith("$") and " " not in t else ("leer" if not t.strip() or t == "\\31\\3" else "text")
                 w.writerow([p.name, i, cat, t, ""]); rows += 1
-    print(f"{rows} Strings nach {out} exportiert.", file=sys.stderr)
+    print(f"{rows} strings exported to {out}.", file=sys.stderr)
     return 0
 
 
@@ -93,8 +93,8 @@ def cmd_import(args) -> int:
         variant, offs, data = parse(p.read_bytes())
         strings = strings_of(data, offs)
         for idx, text in changes[p.name].items():
-            # Zeilenenden wie im Originalstring: menutext.txd nutzt CR+LF, die CSV (und Git mit
-            # autocrlf) verliert das CR. Ohne CR verschiebt das Spiel z. B. die Pausenanzeige.
+            # line endings as in the original string: menutext.txd uses CR+LF, the CSV (and Git with
+            # autocrlf) loses the CR. Without CR the game shifts e.g. the pause display.
             text = text.replace("\r\n", "\n")
             if idx < len(strings) and b"\r\n" in strings[idx]:
                 text = text.replace("\n", "\r\n")
@@ -106,7 +106,7 @@ def cmd_import(args) -> int:
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(build(variant, offs, data, strings))
     for e in errors:
-        print("FEHLER:", e, file=sys.stderr)
+        print("ERROR:", e, file=sys.stderr)
     return 1 if errors else 0
 
 
@@ -120,7 +120,7 @@ def cmd_test(args) -> int:
         longer = list(strings); longer[-1] += b" (Test)"
         v2, o2, d2 = parse(build(variant, offs, data, longer))
         ok_long = strings_of(d2, o2) == longer
-        print(f"{Path(f).name}: Variante {variant}, {len(offs)} Strings, Roundtrip {'identisch' if same else 'ABWEICHEND'}, Verlängerung {'ok' if ok_long else 'FEHLER'}", file=sys.stderr)
+        print(f"{Path(f).name}: variant {variant}, {len(offs)} strings, round trip {'identical' if same else 'DIFFERENT'}, lengthening {'ok' if ok_long else 'ERROR'}", file=sys.stderr)
         bad += (not same) + (not ok_long)
     return 1 if bad else 0
 

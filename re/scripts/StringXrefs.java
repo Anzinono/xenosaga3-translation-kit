@@ -1,5 +1,5 @@
-// Sucht Strings, die einen Suchbegriff enthalten, und dekompiliert die Funktionen, die darauf verweisen.
-// Aufruf: ... -postScript StringXrefs.java <Suchbegriff> [maxFunktionen]
+// Finds strings containing a search term and decompiles the functions referencing them.
+// Usage: ... -postScript StringXrefs.java <search term> [maxFunctions]
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.DecompInterface;
 import ghidra.program.model.data.StringDataInstance;
